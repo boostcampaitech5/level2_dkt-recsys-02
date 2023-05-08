@@ -1,0 +1,79 @@
+{
+    "os": "Linux-4.4.0-59-generic-x86_64-with-glibc2.27",
+    "python": "3.10.11",
+    "heartbeatAt": "2023-05-07T07:42:04.679893",
+    "startedAt": "2023-05-07T07:42:03.927928",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/opt/ml/input/code/dkt/train.py",
+    "codePath": "train.py",
+    "host": "a1d679af6108",
+    "username": "root",
+    "executable": "/opt/conda/envs/dkt/bin/python3",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2200.176,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.176,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "total": 98.30496215820312,
+        "used": 10.210861206054688
+    },
+    "gpu": "Tesla V100-SXM2-32GB",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "Tesla V100-SXM2-32GB",
+            "memory_total": 34089730048
+        }
+    ],
+    "memory": {
+        "total": 88.49929428100586
+    }
+}
