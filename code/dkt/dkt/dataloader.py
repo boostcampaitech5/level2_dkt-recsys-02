@@ -217,11 +217,13 @@ class DKTDataset(torch.utils.data.Dataset):
                 "now_assessmentItemID": torch.tensor(now_assessmentItemID + 1, dtype=torch.int),
                 "now_KnowledgeTag": torch.tensor(now_KnowledgeTag + 1, dtype=torch.int),
                 "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
+                #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
 
                 "past_testId": torch.tensor(past_testId + 1, dtype=torch.int),
                 "past_assessmentItemID": torch.tensor(past_assessmentItemID + 1, dtype=torch.int),
                 "past_KnowledgeTag": torch.tensor(past_KnowledgeTag + 1, dtype=torch.int),
                 "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
+                #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
                 }
                 seq_len = len(now_answerCode)
             else:
@@ -298,12 +300,14 @@ class DKTDataset(torch.utils.data.Dataset):
         testId_list = []
         KnowledgeTag_list = []
         answerCode_list = []
+        #New Feature_list = []
         print('---------Applying Sliding Window---------')
         for userID, user_seq in tqdm(self.grouped_df):
             assessmentItemID = user_seq['assessmentItemID'].values[::-1]
             testId = user_seq['testId'].values[::-1]
             KnowledgeTag = user_seq['KnowledgeTag'].values[::-1]
             answerCode = user_seq['answerCode'].values[::-1]
+            #New Feature = user_seq['New Feature'].values[::-1]
 
             start_idx = 0
             if len(user_seq) <= self.max_seq_len:
@@ -312,6 +316,8 @@ class DKTDataset(torch.utils.data.Dataset):
                 testId_list.append(testId[::-1])
                 KnowledgeTag_list.append(KnowledgeTag[::-1])
                 answerCode_list.append(answerCode[::-1])
+                #New Feature_list.append(New Feature[::-1])
+
             else:
                 while True:
 
@@ -321,7 +327,8 @@ class DKTDataset(torch.utils.data.Dataset):
                         testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
-                        tmp = torch.zeros(self.max_seq_len)
+                        #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+
                         break
 
                     ######FE시에 추가해야함
@@ -329,10 +336,11 @@ class DKTDataset(torch.utils.data.Dataset):
                     testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
                     KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                     answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
+                    #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     start_idx += self.window
 
         ######FE시에 추가해야함
-        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list
+        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list #New Feature_list
 
 def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils.data.DataLoader]:
     pin_memory = False

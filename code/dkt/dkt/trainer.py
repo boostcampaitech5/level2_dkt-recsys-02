@@ -61,7 +61,8 @@ def run(args,
             save_checkpoint(state={"epoch": epoch + 1,
                                    "state_dict": model_to_save.state_dict()},
                             model_dir=args.model_dir,
-                            model_filename="best_model.pt")
+                            #########모델 이름_best_model.pt로 저장하기
+                            model_filename=f"{args.model.lower()}_best_model.pt")
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
@@ -230,7 +231,8 @@ def save_checkpoint(state: dict, model_dir: str, model_filename: str) -> None:
 
 
 def load_model(args):
-    model_path = os.path.join(args.model_dir, args.model_name)
+    ##########모델 이름_best_model.pt 불러오기
+    model_path = os.path.join(args.model_dir, args.model.lower() + '_' +  args.model_name)
     logger.info("Loading Model from: %s", model_path)
     load_state = torch.load(model_path)
     model = get_model(args)
