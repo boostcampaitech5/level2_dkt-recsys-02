@@ -1,9 +1,9 @@
 import os
-
+import pandas as pd
 import numpy as np
 import torch
 import wandb
-
+import pdb
 from dkt import trainer
 from dkt.args import parse_args
 from dkt.dataloader import Preprocess
@@ -21,8 +21,10 @@ def main(args):
     logger.info("Preparing data ...")
     preprocess = Preprocess(args)
     preprocess.load_train_data(file_name=args.file_name)
-    train_data: np.ndarray = preprocess.get_train_data()
-    train_data, valid_data = preprocess.split_data(data=train_data)
+    train_data: pd.Dataframe = preprocess.get_train_data()
+    
+    train_data, valid_data = preprocess.split_data_df(data=train_data)
+    
     wandb.init(project="dkt", config=vars(args))
     
     logger.info("Building Model ...")

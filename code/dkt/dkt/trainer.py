@@ -14,7 +14,7 @@ from .model import LSTM, LSTMATTN, BERT
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
-
+import pdb
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -90,7 +90,7 @@ def train(train_loader: torch.utils.data.DataLoader,
     for step, batch in enumerate(train_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         preds = model(**batch)
-        targets = batch["correct"]
+        targets = batch["answerCode"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
@@ -107,8 +107,8 @@ def train(train_loader: torch.utils.data.DataLoader,
         total_targets.append(targets.detach())
         losses.append(loss)
 
-    total_preds = torch.concat(total_preds).cpu().numpy()
-    total_targets = torch.concat(total_targets).cpu().numpy()
+    total_preds = torch.cat(total_preds).cpu().numpy()
+    total_targets = torch.cat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -125,7 +125,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     for step, batch in enumerate(valid_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         preds = model(**batch)
-        targets = batch["correct"]
+        targets = batch["answerCode"]
 
         # predictions
         preds = sigmoid(preds[:, -1])
@@ -134,8 +134,8 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
         total_preds.append(preds.detach())
         total_targets.append(targets.detach())
 
-    total_preds = torch.concat(total_preds).cpu().numpy()
-    total_targets = torch.concat(total_targets).cpu().numpy()
+    total_preds = torch.cat(total_preds).cpu().numpy()
+    total_targets = torch.cat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -183,7 +183,6 @@ def get_model(args) -> nn.Module:
             "lstm": LSTM,
             "lstmattn": LSTMATTN,
             "bert": BERT,
-            "lgbm": LightGBM,
         }.get(model_name)(**model_args)
     except KeyError:
         logger.warn("No model name %s found", model_name)
