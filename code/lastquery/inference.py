@@ -4,10 +4,10 @@ import argparse
 import numpy as np
 import torch
 
-from dkt import trainer
-from dkt.args import parse_args
-from dkt.dataloader import Preprocess
-from dkt.utils import get_logger, logging_conf
+from lastquery import trainer
+from lastquery.args import parse_args
+from lastquery.dataloader import Preprocess
+from lastquery.utils import get_logger, logging_conf
 
 
 logger = get_logger(logging_conf)

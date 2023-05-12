@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 from transformers.models.bert.modeling_bert import BertConfig, BertEncoder, BertModel
-
+import torch.nn.functional as F
+import pdb
 
 class ModelBase(nn.Module):
     def __init__(
@@ -191,4 +192,83 @@ class BERT(ModelBase):
         out = self.fc(out).view(batch_size, -1)
         return out
 
-    
+class Feed_Forward_block(nn.Module):
+    """
+    out =  Relu( M_out*w1 + b1) *w2 + b2
+    """
+
+    def __init__(self, dim_ff):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+        self.layer2 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+
+    def forward(self, ffn_in):
+        return self.layer2(F.relu(self.layer1(ffn_in)))
+
+class LastQuery(ModelBase):
+    def __init__(
+        self,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        drop_out: float = 0.1,
+        max_seq_len: float = 20,
+        device: str = 'cpu',
+        **kwargs
+    ):
+        super().__init__(
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+        self.max_seq_len = max_seq_len
+        self.n_heads = n_heads
+        self.drop_out = drop_out
+        self.device = device
+        
+        self.embedding_position = nn.Embedding(self.max_seq_len, self.hidden_dim)
+        
+        self.query = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
+        self.key = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
+        self.value = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
+        
+        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=self.n_heads, batch_first=True)
+
+        self.ffn = Feed_Forward_block(self.hidden_dim)
+        
+        self.lstm = nn.LSTM(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True)
+
+    def get_pos(self, seq_len):
+        # use sine positional embeddinds
+        return torch.arange(seq_len).unsqueeze(0)
+
+    def forward(self, test, question, tag, correct, mask, interaction):
+        X, batch_size = super().forward(test=test,
+                                        question=question,
+                                        tag=tag,
+                                        correct=correct,
+                                        mask=mask,
+                                        interaction=interaction)
+
+        position = self.get_pos(self.max_seq_len).to(self.device)
+        embed_pos = self.embedding_position(position)
+        X = X + embed_pos
+
+        # q = self.query(X)
+        q = self.query(X)[:, -1:, :]
+        k = self.key(X)
+        v = self.value(X)
+
+        out, _ = self.attn(q, k, v)
+        out = self.ffn(out)
+
+        out, _ = self.lstm(out)
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        out = self.fc(out).view(batch_size, -1)
+
+        return out
