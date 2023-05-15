@@ -170,6 +170,8 @@ class DKTDataset(torch.utils.data.Dataset):
         self.data = data
         self.max_seq_len = args.max_seq_len
         self.use_past_present = args.past_present
+        self.shuffle_data = args.shuffle_data
+        self.shuffle_n = args.shuffle_n
         #######FE시에 추가해야함
         self.grouped_df = self.data.groupby('userID')
 
@@ -293,6 +295,21 @@ class DKTDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         if self.data_augmentation: return len(self.answerCode_list)
         else: return len(self.grouped_value)
+
+    ########마지막 seq를 제외하고는 섞기
+    def shuffle(self, data_list, data):
+        last = data[-1]
+        before = data[:-1]
+        data_list.append(data)
+        for i in range(self.shuffle_n):
+            # shuffle 횟수만큼 window를 랜덤하게 계속 섞어서 데이터로 추가
+            #random_index = np.random.permutation(len(before))
+            #shuffled = before[random_index]
+            shuffled = np.random.permutation(before)
+            shuffled = np.append(shuffled, last)
+            data_list.append(shuffled)
+        return data_list
+    
     
     def _data_augmentation(self):
         ######FE시에 추가해야함
@@ -312,31 +329,37 @@ class DKTDataset(torch.utils.data.Dataset):
             start_idx = 0
             if len(user_seq) <= self.max_seq_len:
                 ######FE시에 추가해야함
-                assessmentItemID_list.append(assessmentItemID[::-1])
-                testId_list.append(testId[::-1])
-                KnowledgeTag_list.append(KnowledgeTag[::-1])
-                answerCode_list.append(answerCode[::-1])
-                #New Feature_list.append(New Feature[::-1])
+                if self.shuffle_data:
+                    assessmentItemID_list = self.shuffle(assessmentItemID_list,  assessmentItemID[::-1])
+                    testId_list = self.shuffle(testId_list,  testId[::-1])
+                    KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[::-1])
+                    answerCode_list = self.shuffle(answerCode_list,  answerCode[::-1])
+                    #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])
+                else:
+                    assessmentItemID_list.append(assessmentItemID[::-1])
+                    testId_list.append(testId[::-1])
+                    KnowledgeTag_list.append(KnowledgeTag[::-1])
+                    answerCode_list.append(answerCode[::-1])
+                    #New Feature_list.append(New Feature[::-1])
 
             else:
-                while True:
-
+                stop = False
+                while stop == False:
                     ######FE시에 추가해야함
-                    if len(answerCode[start_idx: start_idx + self.max_seq_len]) < self.max_seq_len:
-                        assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len:][::-1])
+                    if len(answerCode[start_idx: start_idx + self.max_seq_len]) < self.max_seq_len: stop = True
+                    ######FE시에 추가해야함
+                    if self.shuffle_data:
+                        assessmentItemID_list = self.shuffle(assessmentItemID_list,  assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
+                        testId_list = self.shuffle(testId_list,  testId[start_idx: start_idx + self.max_seq_len][::-1])
+                        KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
+                        answerCode_list = self.shuffle(answerCode_list,  answerCode[start_idx: start_idx + self.max_seq_len][::-1])
+                        #New Feature_list = self.shuffle(New Feature_list,  New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                    else:
+                        assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
                         testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
-
-                        break
-
-                    ######FE시에 추가해야함
-                    assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
-                    testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
-                    KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
-                    answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
-                    #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     start_idx += self.window
 
         ######FE시에 추가해야함
