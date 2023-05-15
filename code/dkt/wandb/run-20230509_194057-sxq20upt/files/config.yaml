@@ -1,0 +1,116 @@
+wandb_version: 1
+
+seed:
+  desc: null
+  value: 42
+device:
+  desc: null
+  value: cuda
+data_dir:
+  desc: null
+  value: /opt/ml/input/data/
+asset_dir:
+  desc: null
+  value: asset/
+file_name:
+  desc: null
+  value: train_data.csv
+model_dir:
+  desc: null
+  value: models/
+model_name:
+  desc: null
+  value: best_model.pt
+output_dir:
+  desc: null
+  value: outputs/
+test_file_name:
+  desc: null
+  value: test_data.csv
+max_seq_len:
+  desc: null
+  value: 20
+num_workers:
+  desc: null
+  value: 1
+hidden_dim:
+  desc: null
+  value: 64
+n_layers:
+  desc: null
+  value: 2
+n_heads:
+  desc: null
+  value: 2
+drop_out:
+  desc: null
+  value: 0.2
+n_epochs:
+  desc: null
+  value: 20
+batch_size:
+  desc: null
+  value: 64
+lr:
+  desc: null
+  value: 0.0001
+clip_grad:
+  desc: null
+  value: 10
+patience:
+  desc: null
+  value: 5
+log_steps:
+  desc: null
+  value: 50
+model:
+  desc: null
+  value: LSTM
+optimizer:
+  desc: null
+  value: adam
+scheduler:
+  desc: null
+  value: plateau
+n_questions:
+  desc: null
+  value: 9455
+n_tests:
+  desc: null
+  value: 1538
+n_tags:
+  desc: null
+  value: 913
+_wandb:
+  desc: null
+  value:
+    python_version: 3.11.3
+    cli_version: 0.15.2
+    framework: huggingface
+    huggingface_version: 4.28.1
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1683661257.376433
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 49
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 11
+      - 49
+      - 53
+      - 55
+      3:
+      - 16
+      - 23
+      4: 3.11.3
+      5: 0.15.2
+      6: 4.28.1
+      8:
+      - 5

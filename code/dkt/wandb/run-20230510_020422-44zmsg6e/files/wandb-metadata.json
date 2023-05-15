@@ -1,0 +1,90 @@
+{
+    "os": "Linux-4.4.0-59-generic-x86_64-with-glibc2.27",
+    "python": "3.11.3",
+    "heartbeatAt": "2023-05-10T02:04:23.491086",
+    "startedAt": "2023-05-10T02:04:22.931522",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--device",
+        "gpu",
+        "--model",
+        "BERT"
+    ],
+    "state": "running",
+    "program": "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/train.py",
+    "codePath": "code/dkt/train.py",
+    "git": {
+        "remote": "https://github.com/boostcampaitech5/level2_dkt-recsys-02.git",
+        "commit": "013e62fdd240559a95f06c8a7e0d0164e7a94de9"
+    },
+    "email": "kimyoungseo0330@gmail.com",
+    "root": "/opt/ml/input/kys/level2_dkt-recsys-02",
+    "host": "eb34813a7acd",
+    "username": "root",
+    "executable": "/opt/conda/envs/.venv1/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2200.106,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2200.106,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "total": 98.30496215820312,
+        "used": 15.531303405761719
+    },
+    "gpu": "Tesla V100-SXM2-32GB",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "Tesla V100-SXM2-32GB",
+            "memory_total": 34089730048
+        }
+    ],
+    "memory": {
+        "total": 88.49929428100586
+    }
+}

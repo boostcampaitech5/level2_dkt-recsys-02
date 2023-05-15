@@ -22,7 +22,7 @@ class ModelBase(nn.Module):
         # Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
         hd, intd = hidden_dim, hidden_dim // 3
-        self.embedding_interaction = nn.Embedding(3, intd) # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction =nn.Embedding(3, intd) # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_test = nn.Embedding(n_tests + 1, intd)
         self.embedding_question = nn.Embedding(n_questions + 1, intd)
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
@@ -165,9 +165,10 @@ class BERT(ModelBase):
             n_questions,
             n_tags
         )
-        self.n_heads = n_heads
-        self.drop_out = drop_out
-        # Bert config
+        self.n_heads = n_heads #BERT 내의 어텐션 헤드 개수
+        self.drop_out = drop_out #드롭아웃 비율
+
+        # Bert config(설정)
         self.config = BertConfig(
             3,  # not used
             hidden_size=self.hidden_dim,
@@ -175,9 +176,13 @@ class BERT(ModelBase):
             num_attention_heads=self.n_heads,
             max_position_embeddings=max_seq_len,
         )
+        # BertModel 
+        # : 입력으로 들어오는  임베딩과 그에 따른 어텐션 맵을 출력
+        # : Transformer Encoder 레이어의 집합으로 구성 (어텐션 + feedforward + Add&Norm)
         self.encoder = BertModel(self.config)
 
     def forward(self, test, question, tag, correct, mask, interaction):
+        # Modelbase의 forward 메서드 입력값을 이용 하여 X , batch_size 반환
         X, batch_size = super().forward(test=test,
                                         question=question,
                                         tag=tag,
@@ -186,30 +191,34 @@ class BERT(ModelBase):
                                         interaction=interaction)
 
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
-        out = encoded_layers[0]
+        out = encoded_layers[0] # Bert모델에서 출력하는 마지막 레이어
+        
+        # 메모리 상의 데이터가 contiguous하게 저장되도록 텐서의 저장 방식 조정
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        
+        # fully connected 
         out = self.fc(out).view(batch_size, -1)
         return out
 
     
 
-class LightGBM(BaseModel):
-    def __init__(
-        self,
-        hidden_dim: int = 64,
-        n_layers: int = 2,
-        n_tests: int = 1538,
-        n_questions: int = 9455,
-        n_tags: int = 913,
+# class LightGBM(BaseModel):
+#     def __init__(
+#         self,
+#         hidden_dim: int = 64,
+#         n_layers: int = 2,
+#         n_tests: int = 1538,
+#         n_questions: int = 9455,
+#         n_tags: int = 913,
         
-    ):
-        super().__init__(
-            hidden_dim,
-            n_layers,
-            n_tests,
-            n_questions,
-            n_tags
-        )
+#     ):
+#         super().__init__(
+#             hidden_dim,
+#             n_layers,
+#             n_tests,
+#             n_questions,
+#             n_tags
+#         )
         
-    def forward(self,):
+#     def forward(self,):
         

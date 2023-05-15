@@ -80,6 +80,12 @@ class Preprocess:
 
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         # TODO: Fill in if needed
+        df['month'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[4:6]))
+        df['day'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[6:8]))
+        df['hour'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[8:10]))
+        df['minute'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[10:12]))
+        df['second'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[12:14]))
+
         return df
 
     def load_data_from_file(self, file_name: str, is_train: bool = True) -> np.ndarray:
@@ -100,9 +106,11 @@ class Preprocess:
         self.args.n_tags = len(
             np.load(os.path.join(self.args.asset_dir, "KnowledgeTag_classes.npy"))
         )
-
+#################
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
-        columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
+        columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag",
+                   'month','day','hour','minute','second']
+        #self.user_list
         group = (
             df[columns]
             .groupby("userID")
@@ -112,6 +120,13 @@ class Preprocess:
                     r["assessmentItemID"].values,
                     r["KnowledgeTag"].values,
                     r["answerCode"].values,
+                    
+                    r["month"].values,
+                    r["day"].values,
+                    r["hour"].values,
+                    r["minute"].values,
+                    r["second"].values
+
                 )
             )
         )
@@ -134,12 +149,17 @@ class DKTDataset(torch.utils.data.Dataset):
         row = self.data[index]
         
         # Load from data
-        test, question, tag, correct = row[0], row[1], row[2], row[3]
+        test, question, tag, correct,month, day, hour, minute, second = row[0], row[1], row[2], row[3],row[4], row[5], row[6], row[7],row[8]
         data = {
             "test": torch.tensor(test + 1, dtype=torch.int),
             "question": torch.tensor(question + 1, dtype=torch.int),
             "tag": torch.tensor(tag + 1, dtype=torch.int),
             "correct": torch.tensor(correct, dtype=torch.int),
+            "month"
+            day
+            hour
+            minute
+            second
         }
 
         # Generate mask: max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다

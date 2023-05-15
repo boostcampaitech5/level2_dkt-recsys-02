@@ -1,0 +1,12 @@
+2023-05-09 18:24:58,135 - root - INFO - Building Model ...
+2023-05-09 18:24:58,136 - root - WARNING - Error while loading bert with args: {'hidden_dim': 64, 'n_layers': 2, 'n_tests': 1538, 'n_questions': 9455, 'n_tags': 913, 'n_heads': 2, 'drop_out': 0.2, 'max_seq_len': 20}
+Traceback (most recent call last):
+  File "train.py", line 38, in <module>
+    main(args)
+  File "train.py", line 29, in main
+    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/trainer.py", line 192, in get_model
+    raise e
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/trainer.py", line 186, in get_model
+    "lgbm": LightGBM,
+NameError: name 'LightGBM' is not defined

@@ -1,0 +1,26 @@
+
+2023-05-09 18:27:54,735 - root - INFO - Building Model ...
+2023-05-09 18:27:57,274 - root - INFO - Start Training ...
+2023-05-09 18:27:57,276 - root - INFO - Start Training: Epoch 1
+Traceback (most recent call last):
+  File "train.py", line 38, in <module>
+    main(args)
+  File "train.py", line 32, in main
+    trainer.run(args=args, train_data=train_data, valid_data=valid_data, model=model)
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/trainer.py", line 43, in run
+    train_auc, train_acc, train_loss = train(train_loader=train_loader,
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/trainer.py", line 92, in train
+    preds = model(**batch)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 727, in _call_impl
+    result = self.forward(*input, **kwargs)
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/model.py", line 181, in forward
+    X, batch_size = super().forward(test=test,
+  File "/opt/ml/input/kys/level2_dkt-recsys-02/code/dkt/dkt/model.py", line 39, in forward
+    embed_interaction = self.embedding_interaction(interaction.int())
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/module.py", line 727, in _call_impl
+    result = self.forward(*input, **kwargs)
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/modules/sparse.py", line 124, in forward
+    return F.embedding(
+  File "/opt/conda/lib/python3.8/site-packages/torch/nn/functional.py", line 1852, in embedding
+    return torch.embedding(weight, input, padding_idx, scale_grad_by_freq, sparse)
+RuntimeError: Expected tensor for argument #1 'indices' to have scalar type Long; but got torch.cuda.IntTensor instead (while checking arguments for embedding)

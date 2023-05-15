@@ -157,6 +157,8 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
         preds = preds.cpu().detach().numpy()
         total_preds += list(preds)
 
+    
+
     write_path = os.path.join(args.output_dir, "submission.csv")
     os.makedirs(name=args.output_dir, exist_ok=True)
     with open(write_path, "w", encoding="utf8") as w:
@@ -183,7 +185,7 @@ def get_model(args) -> nn.Module:
             "lstm": LSTM,
             "lstmattn": LSTMATTN,
             "bert": BERT,
-            "lgbm": LightGBM,
+            #"lgbm": LightGBM,
         }.get(model_name)(**model_args)
     except KeyError:
         logger.warn("No model name %s found", model_name)
