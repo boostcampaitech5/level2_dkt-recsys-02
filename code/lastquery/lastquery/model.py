@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from transformers.models.bert.modeling_bert import BertConfig, BertEncoder, BertModel
 import torch.nn.functional as F
-import pdb
 
 class ModelBase(nn.Module):
     def __init__(
@@ -192,6 +191,8 @@ class BERT(ModelBase):
         out = self.fc(out).view(batch_size, -1)
         return out
 
+
+
 class Feed_Forward_block(nn.Module):
     """
     out =  Relu( M_out*w1 + b1) *w2 + b2
@@ -237,15 +238,35 @@ class LastQuery(ModelBase):
         self.key = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
         self.value = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
         
-        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=self.n_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=self.n_heads)
 
         self.ffn = Feed_Forward_block(self.hidden_dim)
         
+        self.ln1 = nn.LayerNorm(self.hidden_dim)
+        self.ln2 = nn.LayerNorm(self.hidden_dim)
+
         self.lstm = nn.LSTM(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True)
+
+        self.activation = nn.Sigmoid()
 
     def get_pos(self, seq_len):
         # use sine positional embeddinds
         return torch.arange(seq_len).unsqueeze(0)
+
+    def init_hidden(self, batch_size):
+        h = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        h = h.to(self.device)
+
+        c = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        c = c.to(self.device)
+
+        return (h, c)
 
     def forward(self, test, question, tag, correct, mask, interaction):
         X, batch_size = super().forward(test=test,
@@ -255,20 +276,34 @@ class LastQuery(ModelBase):
                                         mask=mask,
                                         interaction=interaction)
 
-        position = self.get_pos(self.max_seq_len).to(self.device)
-        embed_pos = self.embedding_position(position)
-        X = X + embed_pos
+        seq_len = interaction.size(1)
 
-        # q = self.query(X)
-        q = self.query(X)[:, -1:, :]
-        k = self.key(X)
-        v = self.value(X)
+        # position = self.get_pos(self.max_seq_len).to(self.device)
+        # embed_pos = self.embedding_position(position)
+        # X = X + embed_pos
+
+        q = self.query(X).permute(1, 0, 2)
+        q = self.query(X)[:, -1:, :].permute(1, 0, 2)
+        k = self.key(X).permute(1, 0, 2)
+        v = self.value(X).permute(1, 0, 2)
 
         out, _ = self.attn(q, k, v)
+
+        out = out.permute(1, 0, 2)
+        out = X + out
+        out = self.ln1(out)
+
         out = self.ffn(out)
 
-        out, _ = self.lstm(out)
+        out = X + out
+        out = self.ln2(out)
+        
+        hidden = self.init_hidden(batch_size)
+        out, hidden = self.lstm(out, hidden)
+        
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
-        out = self.fc(out).view(batch_size, -1)
+        out = self.fc(out)
+        
+        out = self.activation(out).view(batch_size, -1)
 
         return out

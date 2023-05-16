@@ -4,7 +4,7 @@ import os
 import numpy as np
 import torch
 from torch import nn
-from torch.nn.functional import sigmoid
+from torch import sigmoid
 import wandb
 
 from .criterion import get_criterion
@@ -90,7 +90,7 @@ def train(train_loader: torch.utils.data.DataLoader,
     for step, batch in enumerate(train_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         preds = model(**batch)
-        targets = batch["correct"][:, -1:]
+        targets = batch["correct"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
