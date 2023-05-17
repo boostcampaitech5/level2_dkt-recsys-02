@@ -34,6 +34,18 @@ def parse_args():
     parser.add_argument(
         "--max_seq_len", default=20, type=int, help="max sequence length"
     )
+    parser.add_argument(
+        "--data_augmentation", default=False, type=bool, help="Apply sliding window"
+    )
+    parser.add_argument(
+        "--window", default=1, type=int, help="Size of sliding window"
+    )
+    parser.add_argument(
+        "--kfold", default=False, type=bool, help="Kfold"
+    )
+    parser.add_argument(
+        "--past_present", default=False, type=bool, help="use past and present at the same time"
+    )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
 
     # 모델

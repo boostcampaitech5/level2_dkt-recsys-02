@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers.models.bert.modeling_bert import BertConfig, BertEncoder, BertModel
-
+import pdb
 
 class ModelBase(nn.Module):
     def __init__(
@@ -33,13 +33,14 @@ class ModelBase(nn.Module):
         # Fully connected layer
         self.fc = nn.Linear(hd, 1)
     
-    def forward(self, test, question, tag, correct, mask, interaction):
+    ######################## FE시 추가해야함
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
         batch_size = interaction.size(0)
         # Embedding
-        embed_interaction = self.embedding_interaction(interaction.int())
-        embed_test = self.embedding_test(test.int())
-        embed_question = self.embedding_question(question.int())
-        embed_tag = self.embedding_tag(tag.int())
+        embed_interaction = self.embedding_interaction(interaction.long())
+        embed_test = self.embedding_test(testId.long())
+        embed_question = self.embedding_question(assessmentItemID.long())
+        embed_tag = self.embedding_tag(KnowledgeTag.long())
         embed = torch.cat(
             [
                 embed_interaction,
@@ -73,12 +74,12 @@ class LSTM(ModelBase):
         self.lstm = nn.LSTM(
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
         )
-
-    def forward(self, test, question, tag, correct, mask, interaction):
-        X, batch_size = super().forward(test=test,
-                                        question=question,
-                                        tag=tag,
-                                        correct=correct,
+    ######################## FE시 추가해야함
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
+        X, batch_size = super().forward(testId=testId,
+                                        assessmentItemID=assessmentItemID,
+                                        KnowledgeTag=KnowledgeTag,
+                                        answerCode=answerCode,
                                         mask=mask,
                                         interaction=interaction)
         out, _ = self.lstm(X)
@@ -121,12 +122,12 @@ class LSTMATTN(ModelBase):
             attention_probs_dropout_prob=self.drop_out,
         )
         self.attn = BertEncoder(self.config)
-
-    def forward(self, test, question, tag, correct, mask, interaction):
-        X, batch_size = super().forward(test=test,
-                                        question=question,
-                                        tag=tag,
-                                        correct=correct,
+    ######################## FE시 추가해야함
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
+        X, batch_size = super().forward(testId=testId,
+                                        assessmentItemID=assessmentItemID,
+                                        KnowledgeTag=KnowledgeTag,
+                                        answerCode=answerCode,
                                         mask=mask,
                                         interaction=interaction)
 
@@ -153,6 +154,7 @@ class BERT(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        #
         n_heads: int = 2,
         drop_out: float = 0.1,
         max_seq_len: float = 20,
@@ -180,13 +182,12 @@ class BERT(ModelBase):
         # : 입력으로 들어오는  임베딩과 그에 따른 어텐션 맵을 출력
         # : Transformer Encoder 레이어의 집합으로 구성 (어텐션 + feedforward + Add&Norm)
         self.encoder = BertModel(self.config)
-
-    def forward(self, test, question, tag, correct, mask, interaction):
-        # Modelbase의 forward 메서드 입력값을 이용 하여 X , batch_size 반환
-        X, batch_size = super().forward(test=test,
-                                        question=question,
-                                        tag=tag,
-                                        correct=correct,
+    ######################## FE시 추가해야함
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
+        X, batch_size = super().forward(testId=testId,
+                                        assessmentItemID=assessmentItemID,
+                                        KnowledgeTag=KnowledgeTag,
+                                        answerCode=answerCode,
                                         mask=mask,
                                         interaction=interaction)
 
@@ -200,25 +201,25 @@ class BERT(ModelBase):
         out = self.fc(out).view(batch_size, -1)
         return out
 
-    
 
-# class LightGBM(BaseModel):
-#     def __init__(
-#         self,
-#         hidden_dim: int = 64,
-#         n_layers: int = 2,
-#         n_tests: int = 1538,
-#         n_questions: int = 9455,
-#         n_tags: int = 913,
+
+class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
+    def __init__(self, hidden_dim, embedding_size, 
+                 n_assessmentItemID, n_tests, n_questions, n_tags, 
+                 n_heads, n_layers, dropout_rate):
+
+        super().__init__(
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
         
-#     ):
-#         super().__init__(
-#             hidden_dim,
-#             n_layers,
-#             n_tests,
-#             n_questions,
-#             n_tags
-#         )
+    def forward(self,):
         
-#     def forward(self,):
-        
+        # predict
+        emb = torch.concat([self.dropout(past_emb), self.dropout(now_emb)], dim = -1)
+        output = self.predict_layer(emb)
+
+        return output.squeeze(2)

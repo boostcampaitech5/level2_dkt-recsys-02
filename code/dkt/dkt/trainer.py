@@ -14,7 +14,7 @@ from .model import LSTM, LSTMATTN, BERT
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
-
+import pdb
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -61,7 +61,8 @@ def run(args,
             save_checkpoint(state={"epoch": epoch + 1,
                                    "state_dict": model_to_save.state_dict()},
                             model_dir=args.model_dir,
-                            model_filename="best_model.pt")
+                            #########모델 이름_best_model.pt로 저장하기
+                            model_filename=f"{args.model.lower()}_best_model.pt")
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
@@ -90,7 +91,7 @@ def train(train_loader: torch.utils.data.DataLoader,
     for step, batch in enumerate(train_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         preds = model(**batch)
-        targets = batch["correct"]
+        targets = batch["answerCode"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
@@ -107,8 +108,8 @@ def train(train_loader: torch.utils.data.DataLoader,
         total_targets.append(targets.detach())
         losses.append(loss)
 
-    total_preds = torch.concat(total_preds).cpu().numpy()
-    total_targets = torch.concat(total_targets).cpu().numpy()
+    total_preds = torch.cat(total_preds).cpu().numpy()
+    total_targets = torch.cat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -125,7 +126,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     for step, batch in enumerate(valid_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         preds = model(**batch)
-        targets = batch["correct"]
+        targets = batch["answerCode"]
 
         # predictions
         preds = sigmoid(preds[:, -1])
@@ -134,8 +135,8 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
         total_preds.append(preds.detach())
         total_targets.append(targets.detach())
 
-    total_preds = torch.concat(total_preds).cpu().numpy()
-    total_targets = torch.concat(total_targets).cpu().numpy()
+    total_preds = torch.cat(total_preds).cpu().numpy()
+    total_targets = torch.cat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -185,7 +186,6 @@ def get_model(args) -> nn.Module:
             "lstm": LSTM,
             "lstmattn": LSTMATTN,
             "bert": BERT,
-            #"lgbm": LightGBM,
         }.get(model_name)(**model_args)
     except KeyError:
         logger.warn("No model name %s found", model_name)
@@ -233,7 +233,8 @@ def save_checkpoint(state: dict, model_dir: str, model_filename: str) -> None:
 
 
 def load_model(args):
-    model_path = os.path.join(args.model_dir, args.model_name)
+    ##########모델 이름_best_model.pt 불러오기
+    model_path = os.path.join(args.model_dir, args.model.lower() + '_' +  args.model_name)
     logger.info("Loading Model from: %s", model_path)
     load_state = torch.load(model_path)
     model = get_model(args)
