@@ -13,14 +13,14 @@ logger = get_logger(logging_conf)
 def prepare_dataset(device: str, data_dir: str) -> Tuple[dict, dict, int]:
     data = load_data(data_dir=data_dir)
     train_data, test_data = separate_data(data=data)
-    id2index: dict = indexing_data(data=data)
+    id2index : dict = indexing_data(data=data)
     train_data_proc = process_data(data=train_data, id2index=id2index, device=device)
     test_data_proc = process_data(data=test_data, id2index=id2index, device=device)
 
     print_data_stat(train_data, "Train")
     print_data_stat(test_data, "Test")
 
-    return train_data_proc, test_data_proc, len(id2index)
+    return train_data_proc, test_data_proc, id2index 
 
 
 def load_data(data_dir: str) -> pd.DataFrame: 
@@ -50,7 +50,7 @@ def indexing_data(data: pd.DataFrame) -> dict:
     userid2index = {v: i for i, v in enumerate(userid)}
     itemid2index = {v: i + n_user for i, v in enumerate(itemid)}
     id2index = dict(userid2index, **itemid2index)
-    return id2index
+    return id2index 
 
 
 def process_data(data: pd.DataFrame, id2index: dict, device: str) -> dict:

@@ -5,23 +5,62 @@ import pdb
 import math
 import numpy as np
 import copy
+import pickle
+import torch.nn.init as init
+from .layer import SASRecBlock, PositionalEncoding
+
+
+class GraphEmbedding:
+    def __init__(self, args, model):
+        self.args = args
+        with open(f'/opt/ml/input/code/lightgcn/models_param/{model}_item_emb.pkl', 'rb') as f: 
+            item_emb_dic = pickle.load(f)
+            
+            item_emb = []
+            
+            # Apply Xavier uniform initialization
+            
+            item_label = list(item_emb_dic.keys())
+            item_label.sort()
+            for i, label in enumerate(item_label):
+                if i == 0:
+                    self.emb_dim = len(item_emb_dic[label])
+                    item_emb.append(item_emb_dic[label])
+                item_emb.append(item_emb_dic[label])
+            item_emb = torch.tensor(item_emb).to(self.args.device)
+            self.item_emb = nn.Embedding.from_pretrained(item_emb)
+
+    def item_emb(self, item_seq): return self.item_emb(item_seq)
+    def user_emb(self, user_seq): return self.user_emb(user_seq)
+    
 
 class ModelBase(nn.Module):
     def __init__(
         self,
+        args,
         hidden_dim: int = 64,
         n_layers: int = 2,
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        **kwargs
     ):
+
         super().__init__()
+        self.args = args
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
 
+        ##Graph Embedding\
+        self.use_graph = self.args.use_graph
+
+        if self.use_graph:
+            self.graph_emb = GraphEmbedding(args, self.args.graph_model)
+            self.graph_emb_dim = self.graph_emb.emb_dim
+   
         # Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
         hd, intd = hidden_dim, hidden_dim // 3
@@ -40,10 +79,21 @@ class ModelBase(nn.Module):
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
 
         # Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
-        self.comb_proj = nn.Linear(intd * 4, hd)
+        if self.use_graph:
+            self.comb_proj = nn.Sequential(
+                nn.Linear(intd * 4 + self.graph_emb_dim , hd),
+                nn.LayerNorm(hd, eps=1e-6)
+            )     
+        else:
+            self.comb_proj = nn.Sequential(
+                nn.Linear(intd * 4 , hd),
+                nn.LayerNorm(hd, eps=1e-6)
+            )
 
         # Fully connected layer
         self.fc = nn.Linear(hd, 1)
+
+    def get_graph_emb_dim(self): return self.graph_emb_dim
 
     def dic_embed(self, input_dic):
         embed_list = []
@@ -52,16 +102,25 @@ class ModelBase(nn.Module):
                 batch_size = feature_seq.size(0)
                 embed_list.append(self.embedding_dict[feature](feature_seq.long()))
 
+        if (self.use_graph== True) & ('assessmentItemID' in input_dic): 
+            embed_list.append(self.graph_emb.item_emb(input_dic['assessmentItemID'].long()))
+
         embed = torch.cat(embed_list, dim = 2)
         return embed, batch_size
     
     def dic_forward(self, input_dic):
         embed_list = []
         for feature, feature_seq in input_dic.items():
+            batch_size = feature_seq.size(0)
+            
             if feature not in ('answerCode','mask'):
-                batch_size = feature_seq.size(0)
                 embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+
+        if self.use_graph: 
+                    embed_list.append(self.graph_emb.item_emb(input_dic['assessmentItemID'].long()))
+
         embed = torch.cat(embed_list, dim = 2)
+
         X = self.comb_proj(embed)
         return X, batch_size
     
@@ -89,6 +148,7 @@ class ModelBase(nn.Module):
 class LSTM(ModelBase):
     def __init__(
         self,
+        args,
         hidden_dim: int = 64,
         n_layers: int = 2,
         n_tests: int = 1538,
@@ -97,12 +157,14 @@ class LSTM(ModelBase):
         **kwargs
     ):
         super().__init__(
+            args,
             hidden_dim,
             n_layers,
             n_tests,
             n_questions,
             n_tags
         )
+
         self.lstm = nn.LSTM(
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
         )
@@ -124,6 +186,7 @@ class LSTM(ModelBase):
 class LSTMATTN(ModelBase):
     def __init__(
         self,
+        args,
         hidden_dim: int = 64,
         n_layers: int = 2,
         n_tests: int = 1538,
@@ -134,6 +197,7 @@ class LSTMATTN(ModelBase):
         **kwargs
     ):
         super().__init__(
+            args,
             hidden_dim,
             n_layers,
             n_tests,
@@ -184,6 +248,7 @@ class LSTMATTN(ModelBase):
 class BERT(ModelBase):
     def __init__(
         self,
+        args,
         hidden_dim: int = 64,
         n_layers: int = 2,
         n_tests: int = 1538,
@@ -195,6 +260,7 @@ class BERT(ModelBase):
         **kwargs
     ):
         super().__init__(
+            args,
             hidden_dim,
             n_layers,
             n_tests,
@@ -232,10 +298,11 @@ class BERT(ModelBase):
 
 
 
+
 class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
-    def __init__(self, hidden_dim, embedding_size, 
+    def __init__(self, args, hidden_dim, embedding_size, 
                  n_assessmentItemID, n_tests, n_questions, n_tags, 
-                 n_heads, n_layers, dropout_rate):
+                 n_heads, n_layers):
 
         super().__init__(
             hidden_dim,
@@ -244,7 +311,8 @@ class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
             n_questions,
             n_tags
         )
-        
+
+        self.args = args
         self.num_assessmentItemID = n_assessmentItemID
       
         self.num_large_paper_number = self.args.num_large_paper_number
@@ -258,7 +326,7 @@ class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
         self.embedding_size = embedding_size
         self.num_heads = n_heads
         self.num_layers = n_layers
-        self.dropout_rate = dropout_rate
+        self.dropout_rate = self.args.dropout_rate
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         # past
@@ -368,7 +436,6 @@ class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
         now_num_feature : (batch_size, max_len, num_cols)
         
         """
-
         past_cat_feature = input['past_cat_feature'].to(self.device)
         past_num_feature = input['past_num_feature'].to(self.device) 
         past_answerCode = input['past_answerCode']
@@ -421,28 +488,11 @@ class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
         return output.squeeze(2)
 
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=1000):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(p=dropout)
-        self.scale = nn.Parameter(torch.ones(1))
-
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.scale * self.pe[:x.size(0), :]
-        return self.dropout(x)
 
 class Saint(ModelBase):
     def __init__(
         self,
+        args,
         hidden_dim: int = 64,
         n_layers: int = 2,
         n_tests: int = 1538,
@@ -450,25 +500,42 @@ class Saint(ModelBase):
         n_tags: int = 913,
         n_heads: int = 2,
         max_seq_len : int = 20,
-        device : str = 'gpu',
         **kwargs
     ):
         super().__init__(
+            args,
             hidden_dim,
             n_layers,
             n_tests,
             n_questions,
             n_tags
         )
+        self.args = args
         self.max_seq_len = max_seq_len
         self.n_heads = n_heads
-        self.dropout = 0.1
-        self.device = device
-        # self.dropout = self.args.dropout
+        self.device = self.args.device
+        self.dropout = self.args.drop_out
 
         # decoder combination projection
-        self.enc_comb_proj = nn.Linear((self.hidden_dim//3)*3, self.hidden_dim)
-        self.dec_comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+        if self.args.use_graph:
+            self.enc_comb_proj = nn.Sequential(
+                nn.Linear((self.hidden_dim//3)*3 + super().get_graph_emb_dim(), self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim, eps=1e-6),
+                )
+            self.dec_comb_proj = nn.Sequential(
+            nn.Linear((self.hidden_dim//3)*4 + super().get_graph_emb_dim(), self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim, eps=1e-6),
+                )
+        else:
+            self.enc_comb_proj = nn.Sequential(
+                nn.Linear((self.hidden_dim//3)*3, self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim, eps=1e-6),
+                )
+            self.dec_comb_proj = nn.Sequential(
+            nn.Linear((self.hidden_dim//3)*4, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim, eps=1e-6),
+                )
+        
 
         # Positional encoding
         self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
@@ -493,7 +560,7 @@ class Saint(ModelBase):
         self.enc_dec_mask = None
     
     def get_mask(self, seq_len):
-        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1))
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
 
         return mask.masked_fill(mask==1, float('-inf'))
     
@@ -540,3 +607,8 @@ class Saint(ModelBase):
         preds = self.activation(out).view(batch_size, -1)
 
         return preds
+
+
+
+
+    
