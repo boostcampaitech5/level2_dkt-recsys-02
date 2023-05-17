@@ -38,7 +38,13 @@ def parse_args():
         "--data_augmentation", default=False, type=bool, help="Apply sliding window"
     )
     parser.add_argument(
-        "--window", default=1, type=int, help="Size of sliding window"
+        "--window", default=10, type=int, help="Size of sliding window"
+    )
+    parser.add_argument(
+        "--shuffle_data", default=False, type=bool,  help="Shuffle data"
+    )
+    parser.add_argument(
+        "--shuffle_n", default=1, type=int, help="Num shuffle"
     )
     parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"

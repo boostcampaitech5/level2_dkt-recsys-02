@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 from transformers.models.bert.modeling_bert import BertConfig, BertEncoder, BertModel
 import pdb
+import math
+import numpy as np
+import copy
 
 class ModelBase(nn.Module):
     def __init__(
@@ -26,14 +29,43 @@ class ModelBase(nn.Module):
         self.embedding_test = nn.Embedding(n_tests + 1, intd)
         self.embedding_question = nn.Embedding(n_questions + 1, intd)
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
+        #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
 
-        # Concatentaed Embedding Projection
+######################## FE시 추가해야함
+        self.embedding_dict = {}
+        self.embedding_dict['testId'] = self.embedding_test
+        self.embedding_dict['assessmentItemID'] = self.embedding_question
+        self.embedding_dict['KnowledgeTag'] = self.embedding_tag
+        self.embedding_dict['interaction'] = self.embedding_interaction
+        #self.embedding_dict['New Feature'] = self.New Feature Embedding
+
+        # Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
         self.comb_proj = nn.Linear(intd * 4, hd)
 
         # Fully connected layer
         self.fc = nn.Linear(hd, 1)
+
+    def dic_embed(self, input_dic):
+        embed_list = []
+        for feature, feature_seq in input_dic.items():
+            if feature not in ('answerCode','mask'):
+                batch_size = feature_seq.size(0)
+                embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+
+        embed = torch.cat(embed_list, dim = 2)
+        return embed, batch_size
     
-    ######################## FE시 추가해야함
+    def dic_forward(self, input_dic):
+        embed_list = []
+        for feature, feature_seq in input_dic.items():
+            if feature not in ('answerCode','mask'):
+                batch_size = feature_seq.size(0)
+                embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+        embed = torch.cat(embed_list, dim = 2)
+        X = self.comb_proj(embed)
+        return X, batch_size
+    
+######################## FE시 추가해야함
     def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
         batch_size = interaction.size(0)
         # Embedding
@@ -75,13 +107,14 @@ class LSTM(ModelBase):
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
         )
     ######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
-        X, batch_size = super().forward(testId=testId,
-                                        assessmentItemID=assessmentItemID,
-                                        KnowledgeTag=KnowledgeTag,
-                                        answerCode=answerCode,
-                                        mask=mask,
-                                        interaction=interaction)
+    def forward(self, input_dic):
+        #X, batch_size = super().forward(testId=testId,
+        #                                assessmentItemID=assessmentItemID,
+        #                                KnowledgeTag=KnowledgeTag,
+        #                                answerCode=answerCode,
+        #                                mask=mask,
+        #                                interaction=interaction)
+        X, batch_size = super().dic_forward(input_dic)
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)
@@ -123,13 +156,15 @@ class LSTMATTN(ModelBase):
         )
         self.attn = BertEncoder(self.config)
     ######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
-        X, batch_size = super().forward(testId=testId,
-                                        assessmentItemID=assessmentItemID,
-                                        KnowledgeTag=KnowledgeTag,
-                                        answerCode=answerCode,
-                                        mask=mask,
-                                        interaction=interaction)
+    def forward(self, input_dic):
+        #X, batch_size = super().forward(testId=testId,
+        #                                assessmentItemID=assessmentItemID,
+        #                               KnowledgeTag=KnowledgeTag,
+        #                              answerCode=answerCode,
+        #                               mask=mask,
+        #                              interaction=interaction)
+        X, batch_size = super().dic_forward(input_dic)
+        mask = input_dic['mask']
 
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
@@ -178,13 +213,16 @@ class BERT(ModelBase):
         )
         self.encoder = BertModel(self.config)
     ######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
-        X, batch_size = super().forward(testId=testId,
-                                        assessmentItemID=assessmentItemID,
-                                        KnowledgeTag=KnowledgeTag,
-                                        answerCode=answerCode,
-                                        mask=mask,
-                                        interaction=interaction)
+    def forward(self, input_dic):
+        #X, batch_size = super().forward(testId=testId,
+        #                                assessmentItemID=assessmentItemID,
+        #                                KnowledgeTag=KnowledgeTag,
+        #                                answerCode=answerCode,
+        #                                mask=mask,
+        #                                interaction=interaction)
+
+        X, batch_size = super().dic_forward(input_dic)
+        mask = input_dic['mask']
 
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
         out = encoded_layers[0]
@@ -381,3 +419,124 @@ class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
         output = self.predict_layer(emb)
 
         return output.squeeze(2)
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=1000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        self.scale = nn.Parameter(torch.ones(1))
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.scale * self.pe[:x.size(0), :]
+        return self.dropout(x)
+
+class Saint(ModelBase):
+    def __init__(
+        self,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        max_seq_len : int = 20,
+        device : str = 'gpu',
+        **kwargs
+    ):
+        super().__init__(
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+        self.max_seq_len = max_seq_len
+        self.n_heads = n_heads
+        self.dropout = 0.1
+        self.device = device
+        # self.dropout = self.args.dropout
+
+        # decoder combination projection
+        self.enc_comb_proj = nn.Linear((self.hidden_dim//3)*3, self.hidden_dim)
+        self.dec_comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+
+        # Positional encoding
+        self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+        self.pos_decoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+
+        # DECODER embedding
+        # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
+        self.transformer = nn.Transformer(
+            d_model=self.hidden_dim, 
+            nhead=self.n_heads,
+            num_encoder_layers=self.n_layers, 
+            num_decoder_layers=self.n_layers, 
+            dim_feedforward=self.hidden_dim, 
+            dropout=self.dropout, 
+            activation='relu')
+
+        self.fc = nn.Linear(self.hidden_dim, 1)
+        self.activation = nn.Sigmoid()
+
+        self.enc_mask = None
+        self.dec_mask = None
+        self.enc_dec_mask = None
+    
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1))
+
+        return mask.masked_fill(mask==1, float('-inf'))
+    
+    
+    def forward(self, input_dic):
+   
+        enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
+        embed_enc, batch_size = super().dic_embed(enc_input)
+        embed_dec, batch_size = super().dic_embed(input_dic)
+        
+        seq_len = input_dic['interaction'].size(1)
+        
+        embed_enc = self.enc_comb_proj(embed_enc)
+        embed_dec = self.dec_comb_proj(embed_dec)
+        # ATTENTION MASK 생성
+        # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
+        # 사실 이렇게 3개로 나눌 필요가 없다
+        if self.enc_mask is None or self.enc_mask.size(0) != seq_len:
+            self.enc_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.dec_mask is None or self.dec_mask.size(0) != seq_len:
+            self.dec_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.enc_dec_mask is None or self.enc_dec_mask.size(0) != seq_len:
+            self.enc_dec_mask = self.get_mask(seq_len).to(self.device)
+
+  
+        embed_enc = embed_enc.permute(1, 0, 2)
+        embed_dec = embed_dec.permute(1, 0, 2)
+        
+        # Positional encoding
+        embed_enc = self.pos_encoder(embed_enc)
+        embed_dec = self.pos_decoder(embed_dec)
+        
+        out = self.transformer(embed_enc, embed_dec,
+                               src_mask=self.enc_mask,
+                               tgt_mask=self.dec_mask,
+                               memory_mask=self.enc_dec_mask)
+
+        out = out.permute(1, 0, 2)
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        out = self.fc(out)
+
+        preds = self.activation(out).view(batch_size, -1)
+
+        return preds

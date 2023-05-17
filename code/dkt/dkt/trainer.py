@@ -10,7 +10,7 @@ import wandb
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, BERT
+from .model import LSTM, LSTMATTN, BERT, Saint
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
@@ -90,7 +90,8 @@ def train(train_loader: torch.utils.data.DataLoader,
     losses = []
     for step, batch in enumerate(train_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
-        preds = model(**batch)
+        #preds = model(**batch)
+        preds = model(batch)
         targets = batch["answerCode"]
         
         loss = compute_loss(preds=preds, targets=targets)
@@ -125,7 +126,8 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     total_targets = []
     for step, batch in enumerate(valid_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
-        preds = model(**batch)
+        #preds = model(**batch)
+        preds = model(batch)
         targets = batch["answerCode"]
 
         # predictions
@@ -177,6 +179,7 @@ def get_model(args) -> nn.Module:
         n_heads=args.n_heads,
         drop_out=args.drop_out,
         max_seq_len=args.max_seq_len,
+        device = args.device
     )
     try:
         model_name = args.model.lower()
@@ -184,6 +187,7 @@ def get_model(args) -> nn.Module:
             "lstm": LSTM,
             "lstmattn": LSTMATTN,
             "bert": BERT,
+            'saint':Saint,
         }.get(model_name)(**model_args)
     except KeyError:
         logger.warn("No model name %s found", model_name)
