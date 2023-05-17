@@ -1,6 +1,10 @@
 *.pt
 *.pth
 
-wandb
-__pycache__
-.*
+models/
+outputs/
+wandb/
+__pycache__/
+.ipynb_checkpoints/
+
+run.log
