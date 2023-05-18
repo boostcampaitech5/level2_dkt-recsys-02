@@ -1,2 +1,10 @@
 *.pt
 *.pth
+
+models/
+outputs/
+wandb/
+__pycache__/
+.ipynb_checkpoints/
+
+run.log

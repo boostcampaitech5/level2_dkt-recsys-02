@@ -146,18 +146,20 @@ class Preprocess:
 #################
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
         columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
-        group = (
-            df[columns]
-            .groupby("userID")
-            .apply(
-                lambda r: (
-                    r["testId"].values,
-                    r["assessmentItemID"].values,
-                    r["KnowledgeTag"].values,
-                    r["answerCode"].values,
-                )
-            )
-        )
+        self.user_list = df['userID'].unique().tolist()
+
+        #group = (
+        #    df[columns]
+        #    .groupby("userID")
+        #    .apply(
+        #        lambda r: (
+        #            r["testId"].values,
+        #            r["assessmentItemID"].values,
+        #            r["KnowledgeTag"].values,
+        #            r["answerCode"].values,
+        #        )
+        #    )
+        #)
 
         return df
 
@@ -174,6 +176,8 @@ class DKTDataset(torch.utils.data.Dataset):
         self.data = data
         self.max_seq_len = args.max_seq_len
         self.use_past_present = args.past_present
+        self.shuffle_data = args.shuffle_data
+        self.shuffle_n = args.shuffle_n
         #######FE시에 추가해야함
         self.grouped_df = self.data.groupby('userID')
 
@@ -196,32 +200,93 @@ class DKTDataset(torch.utils.data.Dataset):
             self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list = self._data_augmentation()
 
     def __getitem__(self, index: int) -> dict:
-        row = self.data[index]
-        
-        # Load from data
-        test, question, tag, correct = row[0], row[1], row[2], row[3]
-        data = {
-            "test": torch.tensor(test + 1, dtype=torch.int),
-            "question": torch.tensor(question + 1, dtype=torch.int),
-            "tag": torch.tensor(tag + 1, dtype=torch.int),
-            "correct": torch.tensor(correct, dtype=torch.int),
-        }
+####################Sliding Window 적용 시
+        if self.data_augmentation:
+####################FE 추가 시 추가해야함
+            assessmentItemID = self.assessmentItemID_list[index]
+            testId = self.testId_list[index]
+            KnowledgeTag = self.KnowledgeTag_list[index]
+            answerCode = self.answerCode_list[index]
+            #New Feature = self.New_Feature_list[index]
 
-        # Generate mask: max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
-        seq_len = len(row[0])
-        if seq_len > self.max_seq_len:
-            for k, seq in data.items():
-                data[k] = seq[-self.max_seq_len:]
-            mask = torch.ones(self.max_seq_len, dtype=torch.int16)
+            if self.use_past_present:
+                now_assessmentItemID = assessmentItemID[1:, :]
+                now_testId = testId[1:, :]
+                now_KnowledgeTag = KnowledgeTag[1:]
+                now_answerCode = answerCode[1:]
+                
+                past_assessmentItemID = assessmentItemID[:-1, :]
+                past_testId = testId[:-1, :]
+                past_KnowledgeTag = KnowledgeTag[:-1, :]
+                past_answerCode = answerCode[:-1, :]
+
+                data = {
+                "now_testId": torch.tensor(now_testId + 1, dtype=torch.int),
+                "now_assessmentItemID": torch.tensor(now_assessmentItemID + 1, dtype=torch.int),
+                "now_KnowledgeTag": torch.tensor(now_KnowledgeTag + 1, dtype=torch.int),
+                "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
+                #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
+
+                "past_testId": torch.tensor(past_testId + 1, dtype=torch.int),
+                "past_assessmentItemID": torch.tensor(past_assessmentItemID + 1, dtype=torch.int),
+                "past_KnowledgeTag": torch.tensor(past_KnowledgeTag + 1, dtype=torch.int),
+                "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
+                #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
+                }
+                seq_len = len(now_answerCode)
+            else:
+                data = {
+                "testId": torch.tensor(testId + 1, dtype=torch.int),
+                "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
+                "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
+                "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+                }
+                seq_len = len(answerCode)
+
+
+####################Mask 만들기
+            if seq_len >= self.max_seq_len:
+                mask = torch.ones(self.max_seq_len, dtype=torch.int16)
+            else:
+                for feature in data:
+                    # Pre-padding non-valid sequences
+                    tmp = torch.zeros(self.max_seq_len)
+                    tmp[self.max_seq_len-seq_len:] = data[feature]
+                    data[feature] = tmp
+                mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
+                mask[-seq_len:] = 1
+
+            data["mask"] = mask
+####################Sliding Window 미적용 시
         else:
-            for k, seq in data.items():
-                # Pre-padding non-valid sequences
-                tmp = torch.zeros(self.max_seq_len)
-                tmp[self.max_seq_len-seq_len:] = data[k]
-                data[k] = tmp
-            mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
-            mask[-seq_len:] = 1
-        data["mask"] = mask
+            row = self.grouped_value[index]
+####################FE 추가 시 추가해야함
+            testId, assessmentItemID, KnowledgeTag, answerCode = row[0], row[1], row[2], row[3]
+            data = {
+                "testId": torch.tensor(testId + 1, dtype=torch.int),
+                "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
+                "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
+                "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+                }
+            
+####################Mask 만들기       
+            seq_len = len(answerCode)
+
+            if seq_len > self.max_seq_len:
+                for k, seq in data.items():
+                    data[k] = seq[-self.max_seq_len:]
+                mask = torch.ones(self.max_seq_len, dtype=torch.int16)
+            else:
+                for k, seq in data.items():
+                    # Pre-padding non-valid sequences
+                    tmp = torch.zeros(self.max_seq_len)
+                    tmp[self.max_seq_len-seq_len:] = data[k]
+                    data[k] = tmp
+                mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
+                mask[-seq_len:] = 1
+            data["mask"] = mask
         
 ####################Generate interaction
         interaction = data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
@@ -236,6 +301,21 @@ class DKTDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         if self.data_augmentation: return len(self.answerCode_list)
         else: return len(self.grouped_value)
+
+    ########마지막 seq를 제외하고는 섞기
+    def shuffle(self, data_list, data):
+        last = data[-1]
+        before = data[:-1]
+        data_list.append(data)
+        for i in range(self.shuffle_n):
+            # shuffle 횟수만큼 window를 랜덤하게 계속 섞어서 데이터로 추가
+            #random_index = np.random.permutation(len(before))
+            #shuffled = before[random_index]
+            shuffled = np.random.permutation(before)
+            shuffled = np.append(shuffled, last)
+            data_list.append(shuffled)
+        return data_list
+    
     
     def _data_augmentation(self):
         ######FE시에 추가해야함
@@ -243,8 +323,7 @@ class DKTDataset(torch.utils.data.Dataset):
         testId_list = []
         KnowledgeTag_list = []
         answerCode_list = []
-
-        # New Feature_list = []
+        #New Feature_list = []
         print('---------Applying Sliding Window---------')
         for userID, user_seq in tqdm(self.grouped_df):
             assessmentItemID = user_seq['assessmentItemID'].values[::-1]
@@ -256,31 +335,37 @@ class DKTDataset(torch.utils.data.Dataset):
             start_idx = 0
             if len(user_seq) <= self.max_seq_len:
                 ######FE시에 추가해야함
-                assessmentItemID_list.append(assessmentItemID[::-1])
-                testId_list.append(testId[::-1])
-                KnowledgeTag_list.append(KnowledgeTag[::-1])
-                answerCode_list.append(answerCode[::-1])
-                #New Feature_list.append(New Feature[::-1])
+                if self.shuffle_data:
+                    assessmentItemID_list = self.shuffle(assessmentItemID_list,  assessmentItemID[::-1])
+                    testId_list = self.shuffle(testId_list,  testId[::-1])
+                    KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[::-1])
+                    answerCode_list = self.shuffle(answerCode_list,  answerCode[::-1])
+                    #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])
+                else:
+                    assessmentItemID_list.append(assessmentItemID[::-1])
+                    testId_list.append(testId[::-1])
+                    KnowledgeTag_list.append(KnowledgeTag[::-1])
+                    answerCode_list.append(answerCode[::-1])
+                    #New Feature_list.append(New Feature[::-1])
 
             else:
-                while True:
-
+                stop = False
+                while stop == False:
                     ######FE시에 추가해야함
-                    if len(answerCode[start_idx: start_idx + self.max_seq_len]) < self.max_seq_len:
-                        assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len:][::-1])
+                    if len(answerCode[start_idx: start_idx + self.max_seq_len]) < self.max_seq_len: stop = True
+                    ######FE시에 추가해야함
+                    if self.shuffle_data:
+                        assessmentItemID_list = self.shuffle(assessmentItemID_list,  assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
+                        testId_list = self.shuffle(testId_list,  testId[start_idx: start_idx + self.max_seq_len][::-1])
+                        KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
+                        answerCode_list = self.shuffle(answerCode_list,  answerCode[start_idx: start_idx + self.max_seq_len][::-1])
+                        #New Feature_list = self.shuffle(New Feature_list,  New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                    else:
+                        assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
                         testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
-
-                        break
-
-                    ######FE시에 추가해야함
-                    assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
-                    testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
-                    KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
-                    answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
-                    #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     start_idx += self.window
 
         ######FE시에 추가해야함

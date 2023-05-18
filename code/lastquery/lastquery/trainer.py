@@ -4,17 +4,17 @@ import os
 import numpy as np
 import torch
 from torch import nn
-from torch.nn.functional import sigmoid
+from torch import sigmoid
 import wandb
 
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, BERT, Saint
+from .model import LSTM, LSTMATTN, BERT, LastQuery
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
-import pdb
+
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -61,8 +61,7 @@ def run(args,
             save_checkpoint(state={"epoch": epoch + 1,
                                    "state_dict": model_to_save.state_dict()},
                             model_dir=args.model_dir,
-                            #########모델 이름_best_model.pt로 저장하기
-                            model_filename=f"{args.model.lower()}_best_model.pt")
+                            model_filename="best_model.pt")
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
@@ -90,9 +89,8 @@ def train(train_loader: torch.utils.data.DataLoader,
     losses = []
     for step, batch in enumerate(train_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
-        preds = model(batch)
-        targets = batch["answerCode"]
+        preds = model(**batch)
+        targets = batch["correct"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
@@ -109,8 +107,8 @@ def train(train_loader: torch.utils.data.DataLoader,
         total_targets.append(targets.detach())
         losses.append(loss)
 
-    total_preds = torch.cat(total_preds).cpu().numpy()
-    total_targets = torch.cat(total_targets).cpu().numpy()
+    total_preds = torch.concat(total_preds).cpu().numpy()
+    total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -126,9 +124,8 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     total_targets = []
     for step, batch in enumerate(valid_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
-        preds = model(batch)
-        targets = batch["answerCode"]
+        preds = model(**batch)
+        targets = batch["correct"]
 
         # predictions
         preds = sigmoid(preds[:, -1])
@@ -137,8 +134,8 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
         total_preds.append(preds.detach())
         total_targets.append(targets.detach())
 
-    total_preds = torch.cat(total_preds).cpu().numpy()
-    total_targets = torch.cat(total_targets).cpu().numpy()
+    total_preds = torch.concat(total_preds).cpu().numpy()
+    total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
@@ -160,8 +157,6 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
         preds = preds.cpu().detach().numpy()
         total_preds += list(preds)
 
-    
-
     write_path = os.path.join(args.output_dir, "submission.csv")
     os.makedirs(name=args.output_dir, exist_ok=True)
     with open(write_path, "w", encoding="utf8") as w:
@@ -181,7 +176,7 @@ def get_model(args) -> nn.Module:
         n_heads=args.n_heads,
         drop_out=args.drop_out,
         max_seq_len=args.max_seq_len,
-        device = args.device
+        device=args.device
     )
     try:
         model_name = args.model.lower()
@@ -189,7 +184,7 @@ def get_model(args) -> nn.Module:
             "lstm": LSTM,
             "lstmattn": LSTMATTN,
             "bert": BERT,
-            'saint':Saint,
+            "lastquery": LastQuery,
         }.get(model_name)(**model_args)
     except KeyError:
         logger.warn("No model name %s found", model_name)
@@ -237,8 +232,7 @@ def save_checkpoint(state: dict, model_dir: str, model_filename: str) -> None:
 
 
 def load_model(args):
-    ##########모델 이름_best_model.pt 불러오기
-    model_path = os.path.join(args.model_dir, args.model.lower() + '_' +  args.model_name)
+    model_path = os.path.join(args.model_dir, args.model_name)
     logger.info("Loading Model from: %s", model_path)
     load_state = torch.load(model_path)
     model = get_model(args)
