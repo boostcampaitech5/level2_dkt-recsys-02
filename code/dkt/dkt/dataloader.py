@@ -11,6 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import KFold
 import pdb
 from featureEngineering import feature_engineering,elo
+import pickle
 
 
 class Preprocess:
@@ -82,7 +83,7 @@ class Preprocess:
 
     def __preprocessing(self, df: pd.DataFrame, is_train: bool = True) -> pd.DataFrame:
         cate_cols = ["assessmentItemID", "testId", "KnowledgeTag"]
-
+        feature_maping_info = {}
         print('---------Preprocessing Data---------')
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
@@ -101,10 +102,13 @@ class Preprocess:
                 df[col] = df[col].apply(
                     lambda x: x if str(x) in le.classes_ else "unknown"
                 )
-
+            
             # 모든 컬럼이 범주형이라고 가정
             df[col] = df[col].astype(str)
             test = le.transform(df[col])
+            label_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+            feature_maping_info[col] = label_mapping
+
             df[col] = test
 
         def convert_time(s: str):
@@ -114,6 +118,9 @@ class Preprocess:
             return int(timestamp)
 
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
+
+        with open('/opt/ml/input/code/dkt/models_param/feature_mapper.pkl', 'wb') as f: 
+            pickle.dump(feature_maping_info, f)
         return df
 
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -227,6 +234,7 @@ class DKTDataset(torch.utils.data.Dataset):
             testId = self.testId_list[index]
             KnowledgeTag = self.KnowledgeTag_list[index]
             answerCode = self.answerCode_list[index]
+            #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
 
             if self.use_past_present:
@@ -260,6 +268,7 @@ class DKTDataset(torch.utils.data.Dataset):
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
                 seq_len = len(answerCode)
@@ -288,6 +297,7 @@ class DKTDataset(torch.utils.data.Dataset):
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
             
@@ -344,6 +354,7 @@ class DKTDataset(torch.utils.data.Dataset):
         KnowledgeTag_list = []
         answerCode_list = []
         #New Feature_list = []
+        #userID_list = []
         print('---------Applying Sliding Window---------')
         for userID, user_seq in tqdm(self.grouped_df):
             assessmentItemID = user_seq['assessmentItemID'].values[::-1]
@@ -367,7 +378,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     KnowledgeTag_list.append(KnowledgeTag[::-1])
                     answerCode_list.append(answerCode[::-1])
                     #New Feature_list.append(New Feature[::-1])
-
+                #userID_list.append([userID]* len(answerCode[::-1]))
             else:
                 stop = False
                 while stop == False:
@@ -386,6 +397,7 @@ class DKTDataset(torch.utils.data.Dataset):
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                    #userID_list.append([userID]* len(answerCode[::-1]))
                     start_idx += self.window
 
         ######FE시에 추가해야함
