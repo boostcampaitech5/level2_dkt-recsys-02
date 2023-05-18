@@ -10,6 +10,8 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import KFold
 import pdb
+from .featureEngineering import feature_engineering,elo
+import pickle
 
 
 class Preprocess:
@@ -81,7 +83,7 @@ class Preprocess:
 
     def __preprocessing(self, df: pd.DataFrame, is_train: bool = True) -> pd.DataFrame:
         cate_cols = ["assessmentItemID", "testId", "KnowledgeTag"]
-
+        feature_maping_info = {}
         print('---------Preprocessing Data---------')
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
@@ -100,10 +102,13 @@ class Preprocess:
                 df[col] = df[col].apply(
                     lambda x: x if str(x) in le.classes_ else "unknown"
                 )
-
+            
             # 모든 컬럼이 범주형이라고 가정
             df[col] = df[col].astype(str)
             test = le.transform(df[col])
+            label_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
+            feature_maping_info[col] = label_mapping
+
             df[col] = test
 
         def convert_time(s: str):
@@ -113,10 +118,41 @@ class Preprocess:
             return int(timestamp)
 
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
+
+        with open('/opt/ml/input/code/dkt/models_param/feature_mapper.pkl', 'wb') as f: 
+            pickle.dump(feature_maping_info, f)
         return df
 
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         # TODO: Fill in if needed
+        print('---------Feature Engineering---------')
+        # featureEngineering.py를 import 해서 사용
+        df = feature_engineering(df)
+        df = elo(df)
+        # 범주형 변수 : [KnowledgeTag,month,day,hour,dayname,bigclass]
+        # 추가된 피쳐
+        # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
+        #  'user_total_answer', #유저가 문제 맞춘 횟수
+        #  'user_acc', #유저의 정답률
+        #  'test_mean', #문항의 정답률
+        #  'test_sum', #문항의 정답횟수
+        #  'tag_mean', #태그의 정답률
+        #  'tag_sum', #태그의 정답횟수
+        #  'elapsed', #유저의 문제풀이시간
+        #  'elapsed_cumsum', #유저의 문제풀이시간 누적
+        #  'elapsed_med', #유저의 문제풀이시간 중앙값
+        #  'month', #월
+        #  'day', #일
+        #  'hour', #시간
+        #  'dayname', #요일
+        #  'bigclass', #대분류
+        #  'bigclasstime', #대분류별 문제풀이시간
+        #  'bigclass_acc', #대분류별 정답률
+        #  'bigclass_sum', #대분류별 문제 맞춘 횟수
+        #  'bigclass_count', #대분류별 문제 푼 횟수
+        #  'elo' #유저의 문제풀이능력
+        
+        
         # print('---------Feature Engineering---------')
         # df['month'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[4:6]))
         # df['day'] = df["Timestamp"].str.replace('[^0-9]','', regex=True).map(lambda x: int(x[6:8]))
@@ -207,6 +243,7 @@ class DKTDataset(torch.utils.data.Dataset):
             testId = self.testId_list[index]
             KnowledgeTag = self.KnowledgeTag_list[index]
             answerCode = self.answerCode_list[index]
+            #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
 
             if self.use_past_present:
@@ -240,6 +277,7 @@ class DKTDataset(torch.utils.data.Dataset):
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
                 seq_len = len(answerCode)
@@ -268,6 +306,7 @@ class DKTDataset(torch.utils.data.Dataset):
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
             
@@ -324,6 +363,7 @@ class DKTDataset(torch.utils.data.Dataset):
         KnowledgeTag_list = []
         answerCode_list = []
         #New Feature_list = []
+        #userID_list = []
         print('---------Applying Sliding Window---------')
         for userID, user_seq in tqdm(self.grouped_df):
             assessmentItemID = user_seq['assessmentItemID'].values[::-1]
@@ -347,7 +387,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     KnowledgeTag_list.append(KnowledgeTag[::-1])
                     answerCode_list.append(answerCode[::-1])
                     #New Feature_list.append(New Feature[::-1])
-
+                #userID_list.append([userID]* len(answerCode[::-1]))
             else:
                 stop = False
                 while stop == False:
@@ -366,6 +406,7 @@ class DKTDataset(torch.utils.data.Dataset):
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                    #userID_list.append([userID]* len(answerCode[::-1]))
                     start_idx += self.window
 
         ######FE시에 추가해야함
