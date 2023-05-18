@@ -10,6 +10,7 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import KFold
 import pdb
+from featureEngineering import feature_engineering,elo
 import pickle
 
 
@@ -125,6 +126,31 @@ class Preprocess:
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         # TODO: Fill in if needed
         print('---------Feature Engineering---------')
+        # featureEngineering.py를 import 해서 사용
+        df = feature_engineering(df)
+        df = elo(df)
+        # 범주형 변수 : [KnowledgeTag,month,day,hour,dayname,bigclass]
+        # 추가된 피쳐
+        # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
+        #  'user_total_answer', #유저가 문제 맞춘 횟수
+        #  'user_acc', #유저의 정답률
+        #  'test_mean', #문항의 정답률
+        #  'test_sum', #문항의 정답횟수
+        #  'tag_mean', #태그의 정답률
+        #  'tag_sum', #태그의 정답횟수
+        #  'elapsed', #유저의 문제풀이시간
+        #  'elapsed_cumsum', #유저의 문제풀이시간 누적
+        #  'elapsed_med', #유저의 문제풀이시간 중앙값
+        #  'month', #월
+        #  'day', #일
+        #  'hour', #시간
+        #  'dayname', #요일
+        #  'bigclass', #대분류
+        #  'bigclasstime', #대분류별 문제풀이시간
+        #  'bigclass_acc', #대분류별 정답률
+        #  'bigclass_sum', #대분류별 문제 맞춘 횟수
+        #  'bigclass_count', #대분류별 문제 푼 횟수
+        #  'elo' #유저의 문제풀이능력
         return df
 
     def load_data_from_file(self, file_name: str, is_train: bool = True) -> np.ndarray:
