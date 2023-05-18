@@ -8,7 +8,8 @@ from dkt import trainer
 from dkt.args import parse_args
 from dkt.dataloader import Preprocess
 from dkt.utils import get_logger, set_seeds, logging_conf
-
+from functools import partial
+import yaml
 
 logger = get_logger(logging_conf)
 
