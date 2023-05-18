@@ -15,6 +15,7 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
 import pdb
+import yaml
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -36,6 +37,9 @@ def run(args,
 
     best_auc = -1
     early_stopping_counter = 0
+    losses = []
+    aucs = []
+    accs = []
     for epoch in range(args.n_epochs):
         logger.info("Start Training: Epoch %s", epoch + 1)
 
@@ -45,14 +49,19 @@ def run(args,
                                                  scheduler=scheduler, args=args)
 
         # VALID
-        auc, acc = validate(valid_loader=valid_loader, model=model, args=args)
+        auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
 
         wandb.log(dict(epoch=epoch,
                        train_loss_epoch=train_loss,
                        train_auc_epoch=train_auc,
                        train_acc_epoch=train_acc,
+                       valid_loss_epoch=loss,
                        valid_auc_epoch=auc,
                        valid_acc_epoch=acc))
+        
+        losses.append(loss)
+        aucs.append(auc)
+        accs.append(acc)
         
         if auc > best_auc:
             best_auc = auc
@@ -76,6 +85,29 @@ def run(args,
         # scheduler
         if args.scheduler == "plateau":
             scheduler.step(best_auc)
+            
+    if args.sweep_run:
+        val_loss_avg = sum(losses)/len(losses)
+        val_auc_avg = sum(aucs)/len(aucs)
+        val_acc_avg = sum(accs)/len(accs)
+        
+        wandb.log({
+            'val_loss': val_loss_avg,
+            'val_auc': val_auc_avg,
+            'val_acc': val_acc_avg,
+        })
+        
+        with open('./sweep_best_auc.yaml') as file:
+            output = yaml.load(file, Loader=yaml.FullLoader)
+        file.close()
+            
+        if output[args.model.lower()]['best_auc'] < val_auc_avg:
+            output[args.model.lower()]['best_auc'] = float(val_auc_avg)
+            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(float, dict(wandb.config).values())))
+            
+        with open('./sweep_best_auc.yaml', 'w') as file:
+            yaml.dump(output, file, default_flow_style=False)
+        file.close()
 
 
 def train(train_loader: torch.utils.data.DataLoader,
@@ -124,26 +156,30 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
 
     total_preds = []
     total_targets = []
+    losses = []
     for step, batch in enumerate(valid_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
         #preds = model(**batch)
         preds = model(batch)
         targets = batch["answerCode"]
 
+        loss = compute_loss(preds=preds, targets=targets)
         # predictions
         preds = sigmoid(preds[:, -1])
         targets = targets[:, -1]
 
         total_preds.append(preds.detach())
         total_targets.append(targets.detach())
+        losses.append(loss)
 
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
+    loss_avg = sum(losses) / len(losses)
     logger.info("VALID AUC : %.4f ACC : %.4f", auc, acc)
-    return auc, acc
+    return auc, acc, loss_avg
 
 
 def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
