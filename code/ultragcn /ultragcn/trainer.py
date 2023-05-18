@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +11,12 @@ import configparser
 import time
 import argparse
 from torch.utils.tensorboard import SummaryWriter
+
+
+"""
+Reference:
+https://github.com/xue-pai/UltraGCN/tree/main
+"""
 
 
 def data_param_prepare(config_file):
