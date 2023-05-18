@@ -21,7 +21,8 @@ def main(args):
     logger.info("Preparing data ...")
     preprocess = Preprocess(args)
     preprocess.load_train_data(file_name=args.file_name)
-    train_data: pd.Dataframe = preprocess.get_train_data()
+
+    train_data = preprocess.get_train_data()
     
     train_data, valid_data = preprocess.split_data_df(data=train_data)
     

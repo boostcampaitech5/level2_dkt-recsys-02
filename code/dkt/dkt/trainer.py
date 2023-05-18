@@ -153,8 +153,8 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
     total_preds = []
     for step, batch in enumerate(test_loader):
         batch = {k: v.to(args.device) for k, v in batch.items()}
-        preds = model(**batch)
-
+        #preds = model(**batch)
+        preds = model(batch)
         # predictions
         preds = sigmoid(preds[:, -1])
         preds = preds.cpu().detach().numpy()
@@ -171,15 +171,12 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
 
 def get_model(args) -> nn.Module:
     model_args = dict(
+        args = args,
         hidden_dim=args.hidden_dim,
         n_layers=args.n_layers,
         n_tests=args.n_tests,
         n_questions=args.n_questions,
         n_tags=args.n_tags,
-        n_heads=args.n_heads,
-        drop_out=args.drop_out,
-        max_seq_len=args.max_seq_len,
-        device = args.device
     )
     try:
         model_name = args.model.lower()
@@ -189,6 +186,7 @@ def get_model(args) -> nn.Module:
             "bert": BERT,
             'saint':Saint,
         }.get(model_name)(**model_args)
+  
     except KeyError:
         logger.warn("No model name %s found", model_name)
     except Exception as e:

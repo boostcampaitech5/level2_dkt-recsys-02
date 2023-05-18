@@ -47,6 +47,12 @@ def parse_args():
         "--shuffle_n", default=1, type=int, help="Num shuffle"
     )
     parser.add_argument(
+        "--use_graph", default=False, type=bool,  help="Whether to user Graph Embedding"
+    )
+    parser.add_argument(
+        "--graph_model", default="lgcn", type=str,  help="Which model to use"
+    )
+    parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"
     )
     parser.add_argument(
