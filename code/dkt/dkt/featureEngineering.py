@@ -1,5 +1,11 @@
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+
 def feature_engineering(df):
     df = df.copy()
+    #타임스탬프 타입변환
+    df['Timestamp'] = pd.to_datetime(df['Timestamp'])
     
     day_dict = {'Tuesday': 0,
  'Thursday': 1,
@@ -62,6 +68,10 @@ def feature_engineering(df):
     df = pd.merge(df, correct_k, on=['KnowledgeTag'], how="left")
     df = pd.merge(df, elapsed_med, on =['userID'], how = 'left')
     df.fillna(0,inplace = True)
+    
+    #타임스탬프 타입변환
+    df['Timestamp'] = df['Timestamp'].dt.strftime("%Y-%m-%d %H:%M:%S")
+    
     return df
 
 #elo함수
