@@ -1,0 +1,15 @@
+lgbm:
+  best_auc: 0.8527953822539378
+  parameter:
+    bagging_fraction: 1.0
+    bagging_freq: 3.0
+    boosting: gbdt
+    early_stopping_round: 100.0
+    feature_fraction: 0.6
+    learning_rate: 0.2307868691136815
+    metric: auc
+    num_iterations: 500.0
+    num_leaves: 20.0
+    objective: binary
+    seed: 42.0
+    verbose: -1.0
