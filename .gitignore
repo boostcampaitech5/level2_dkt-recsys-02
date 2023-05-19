@@ -1,6 +1,7 @@
 *.pt
 *.pth
 
+asset/
 models/
 outputs/
 wandb/
