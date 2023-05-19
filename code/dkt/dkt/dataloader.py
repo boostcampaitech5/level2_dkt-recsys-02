@@ -10,7 +10,7 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import KFold
 import pdb
-from featureEngineering import feature_engineering,elo
+from .featureEngineering import feature_engineering,elo
 import pickle
 
 
@@ -118,8 +118,9 @@ class Preprocess:
             return int(timestamp)
 
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
-
-        with open('/opt/ml/input/code/dkt/models_param/feature_mapper.pkl', 'wb') as f: 
+        
+        current_dir = os.getcwd()  
+        with open(current_dir+'/models_param/feature_mapper.pkl', 'wb') as f: 
             pickle.dump(feature_maping_info, f)
         return df
 
