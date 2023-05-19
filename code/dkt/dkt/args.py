@@ -85,6 +85,10 @@ def parse_args():
     parser.add_argument(
         "--scheduler", default="plateau", type=str, help="scheduler type"
     )
+    
+    ### wandb ###
+    parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
+    parser.add_argument("--tuning_count", default=5, type=int, help="tuning count")
 
     args = parser.parse_args()
 

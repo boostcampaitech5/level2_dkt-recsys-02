@@ -5,6 +5,7 @@ asset/
 models/
 outputs/
 wandb/
+asset/
 __pycache__/
 .ipynb_checkpoints/
 
