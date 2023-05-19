@@ -25,15 +25,22 @@ def main(args):
 
     train_data = preprocess.get_train_data()
     
-    train_data, valid_data = preprocess.split_data_df(data=train_data)
+    if args.kfold:
+        kfolds = preprocess.split_data_df(data=train_data)
+    else:
+        train_data, valid_data = preprocess.split_data_df(data=train_data)
     
     wandb.init(project="dkt", config=vars(args))
     
     logger.info("Building Model ...")
-    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+    
     
     logger.info("Start Training ...")
-    trainer.run(args=args, train_data=train_data, valid_data=valid_data, model=model)
+    if args.kfold:
+        trainer.run_kfold(args=args, kfolds = kfolds)
+    else:
+        model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+        trainer.run(args=args, train_data=train_data, valid_data=valid_data, model=model)
 
 
 def config2args(args):
@@ -77,7 +84,7 @@ if __name__ == "__main__":
     args = parse_args()
     os.makedirs(args.model_dir, exist_ok=True)
     if args.sweep_run:
-        with open('./sweep_config.yaml') as file:
+        with open('/opt/level2_dkt-recsys-02/code/dkt/sweep_config.yaml') as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
 

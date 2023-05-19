@@ -53,7 +53,13 @@ def parse_args():
         "--graph_model", default="lgcn", type=str,  help="Which model to use"
     )
     parser.add_argument(
+        "--use_res", default=False, type=bool,  help="Use Residual Connection"
+    )
+    parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"
+    )
+    parser.add_argument(
+        "--n_folds", default=5, type=int, help="Num of Kfold"
     )
     parser.add_argument(
         "--past_present", default=False, type=bool, help="use past and present at the same time"
