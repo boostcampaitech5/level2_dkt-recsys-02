@@ -239,20 +239,21 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in enumerate(valid_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
-        preds = model(batch)
-        targets = batch["answerCode"]
+    with torch.no_grad():
+        for step, batch in enumerate(valid_loader):
+            batch = {k: v.to(args.device) for k, v in batch.items()}
+            #preds = model(**batch)
+            preds = model(batch)
+            targets = batch["answerCode"]
 
-        loss = compute_loss(preds=preds, targets=targets)
-        # predictions
-        preds = sigmoid(preds[:, -1])
-        targets = targets[:, -1]
+            loss = compute_loss(preds=preds, targets=targets)
+            # predictions
+            preds = sigmoid(preds[:, -1])
+            targets = targets[:, -1]
 
-        total_preds.append(preds.detach())
-        total_targets.append(targets.detach())
-        losses.append(loss)
+            total_preds.append(preds.detach())
+            total_targets.append(targets.detach())
+            losses.append(loss)
 
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()
@@ -265,7 +266,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     del batch, total_preds, total_targets, preds, losses
     gc.collect()
     torch.cuda.empty_cache()
-    
+
     return auc, acc, loss_avg
 
 

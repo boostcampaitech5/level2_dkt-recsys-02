@@ -616,13 +616,11 @@ class Saint(ModelBase):
     def forward(self, input_dic):
    
         enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
-        embed_enc, batch_size = super().dic_embed(enc_input)
-        embed_dec, batch_size = super().dic_embed(input_dic)
+        embed_enc, batch_size = super().dic_forward(enc_input)
+        embed_dec, batch_size = super().dic_forward(input_dic)
         
         seq_len = input_dic['interaction'].size(1)
         
-        embed_enc = super().dic_forward(embed_enc)
-        embed_dec = super().dic_forward(embed_dec)
         # ATTENTION MASK 생성
         # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
         # 사실 이렇게 3개로 나눌 필요가 없다
@@ -638,7 +636,7 @@ class Saint(ModelBase):
   
         embed_enc = embed_enc.permute(1, 0, 2)
         embed_dec = embed_dec.permute(1, 0, 2)
-        
+    
         # Positional encoding
         embed_enc = self.pos_encoder(embed_enc)
         embed_dec = self.pos_decoder(embed_dec)
@@ -796,8 +794,11 @@ class TransLSTM_G(ModelBase):
         )
         self.n_heads = n_heads
         self.dropout = drop_out
+        self.max_seq_len = max_seq_len
+
         # Bert config
         self.graph_dim = super().get_graph_emb_dim()
+        self.device = self.args.device
 
         self.lstm = nn.LSTM(
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
@@ -820,11 +821,21 @@ class TransLSTM_G(ModelBase):
             dropout=self.dropout, 
             activation='relu')
         
+        self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+        self.pos_decoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+
+        self.enc_mask = None
+        self.dec_mask = None
+        self.enc_dec_mask = None
+
         if self.residual_connection:
             self.fc = nn.Linear(self.hidden_dim*2 + self.graph_dim, 1)
         else:
             self.fc = nn.Linear(self.hidden_dim*2, 1)
-            
+
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
+        return mask
     ######################## FE시 추가해야함
     def forward(self, input_dic):
         #X, batch_size = super().forward(testId=testId,
@@ -836,18 +847,15 @@ class TransLSTM_G(ModelBase):
 
         X, batch_size = super().dic_forward(input_dic)
 
-        
         mask = input_dic['mask']
 
         #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
-        embed_enc, batch_size = super().dic_embed(input_dic)
-        embed_dec, batch_size = super().dic_embed(input_dic)
+        embed_enc, batch_size = super().dic_forward(input_dic)
+        embed_dec, batch_size = super().dic_forward(input_dic)
         
         seq_len = input_dic['interaction'].size(1)
         
-        # ATTENTION MASK 생성
-        # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
-        # 사실 이렇게 3개로 나눌 필요가 없다
+
         if self.enc_mask is None or self.enc_mask.size(0) != seq_len:
             self.enc_mask = self.get_mask(seq_len).to(self.device)
 
@@ -862,6 +870,7 @@ class TransLSTM_G(ModelBase):
         embed_dec = embed_dec.permute(1, 0, 2)
         
         # Positional encoding
+
         embed_enc = self.pos_encoder(embed_enc)
         embed_dec = self.pos_decoder(embed_dec)
         
