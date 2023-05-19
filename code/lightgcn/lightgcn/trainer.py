@@ -68,10 +68,13 @@ def run(
             logger.info("Best model updated AUC from %.4f to %.4f", best_auc, auc)
             best_auc, best_epoch = auc, e
             torch.save(obj= {"model": model.state_dict(), "epoch": e + 1},
-                       f=os.path.join(model_dir, f"best_model.pt"))
+                       f=os.path.join(model_dir, f"lgcn_best_model.pt"))
     torch.save(obj={"model": model.state_dict(), "epoch": e + 1},
                f=os.path.join(model_dir, f"last_model.pt"))
     logger.info(f"Best Weight Confirmed : {best_epoch+1}'th epoch")
+    
+    return model.get_embedding(train_data['edge']).detach().cpu().numpy()
+
 
 
 def train(model: nn.Module, train_data: dict, optimizer: torch.optim.Optimizer):

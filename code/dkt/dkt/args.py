@@ -34,6 +34,30 @@ def parse_args():
     parser.add_argument(
         "--max_seq_len", default=20, type=int, help="max sequence length"
     )
+    parser.add_argument(
+        "--data_augmentation", default=False, type=bool, help="Apply sliding window"
+    )
+    parser.add_argument(
+        "--window", default=10, type=int, help="Size of sliding window"
+    )
+    parser.add_argument(
+        "--shuffle_data", default=False, type=bool,  help="Shuffle data"
+    )
+    parser.add_argument(
+        "--shuffle_n", default=1, type=int, help="Num shuffle"
+    )
+    parser.add_argument(
+        "--use_graph", default=False, type=bool,  help="Whether to user Graph Embedding"
+    )
+    parser.add_argument(
+        "--graph_model", default="lgcn", type=str,  help="Which model to use"
+    )
+    parser.add_argument(
+        "--kfold", default=False, type=bool, help="Kfold"
+    )
+    parser.add_argument(
+        "--past_present", default=False, type=bool, help="use past and present at the same time"
+    )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
 
     # 모델
@@ -61,6 +85,10 @@ def parse_args():
     parser.add_argument(
         "--scheduler", default="plateau", type=str, help="scheduler type"
     )
+    
+    ### wandb ###
+    parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
+    parser.add_argument("--tuning_count", default=5, type=int, help="tuning count")
 
     args = parser.parse_args()
 
