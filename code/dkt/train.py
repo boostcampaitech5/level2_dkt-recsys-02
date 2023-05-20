@@ -27,7 +27,7 @@ def main(args):
     
     train_data, valid_data = preprocess.split_data_df(data=train_data)
     
-    wandb.init(project="dkt2", entity ="recommy" ,config=vars(args))
+    wandb.init(project="dkt2", config=vars(args))
     
     logger.info("Building Model ...")
     model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
         sweep_id = wandb.sweep(
             sweep=config[args.model.lower()],
-            project='my-first-sweep'
+            project='sequence model'
         )
         wandb_train_func = partial(sweep_main, args)
         wandb.agent(sweep_id, function=wandb_train_func, count=args.tuning_count)

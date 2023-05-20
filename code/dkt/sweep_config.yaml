@@ -31,6 +31,8 @@ bert:
     drop_out:
       min: 0.0
       max: 0.5
+    hidden_dim:
+      values : [64,128]
 
 
 lastquery:
