@@ -1,6 +1,9 @@
 bert:
-  best_auc: -1
-  parameter: null
+  best_auc: 0.736538671625274
+  parameter:
+    drop_out: 0.16756056702625094
+    lr: 0.01
+    n_epochs: 3.0
 catboost:
   best_auc: -1
   parameter: null
@@ -14,8 +17,11 @@ lightgcn:
   best_auc: -1
   parameter: null
 lstm:
-  best_auc: -1
+  best_auc: 0.7620819021724601
   parameter:
+    drop_out: 0.48926390273776144
+    lr: 0.001
+    n_epochs: 2.0
 lstmattn:
   best_auc: -1
   parameter: null

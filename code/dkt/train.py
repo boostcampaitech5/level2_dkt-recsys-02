@@ -27,7 +27,7 @@ def main(args):
     
     train_data, valid_data = preprocess.split_data_df(data=train_data)
     
-    wandb.init(project="dkt", config=vars(args))
+    wandb.init(project="dkt2", entity ="recommy" ,config=vars(args))
     
     logger.info("Building Model ...")
     model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
