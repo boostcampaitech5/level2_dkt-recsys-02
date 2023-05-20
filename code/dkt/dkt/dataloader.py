@@ -83,6 +83,7 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
     def __preprocessing(self, df: pd.DataFrame, is_train: bool = True) -> pd.DataFrame:
+######### FE 시에 범주형 변수 추가 시 추가 부탁
         cate_cols = ["assessmentItemID", "testId", "KnowledgeTag"]
         feature_maping_info = {}
         print('---------Preprocessing Data---------')
@@ -111,6 +112,9 @@ class Preprocess:
             feature_maping_info[col] = label_mapping
 
             df[col] = test
+        
+######### FE 시에  연속형 변수 추가 시 추가 부탁
+
 
         def convert_time(s: str):
             timestamp = time.mktime(
@@ -163,8 +167,10 @@ class Preprocess:
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
 
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
 
+
+######### 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
+######### 카테고리 변수 FE 시에 추가 부탁
         self.args.n_questions = len(
             np.load(os.path.join(self.args.asset_dir, "assessmentItemID_classes.npy"))
         )
@@ -176,21 +182,9 @@ class Preprocess:
         )
 
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
+#########  FE 시에 추가 부탁
         columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
         self.user_list = df['userID'].unique().tolist()
-
-        #group = (
-        #    df[columns]
-        #    .groupby("userID")
-        #    .apply(
-        #        lambda r: (
-        #            r["testId"].values,
-        #            r["assessmentItemID"].values,
-        #            r["KnowledgeTag"].values,
-        #            r["answerCode"].values,
-        #        )
-        #    )
-        #)
 
         return df
 
@@ -231,6 +225,8 @@ class DKTDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index: int) -> dict:
 ####################Sliding Window 적용 시
+
+
         if self.data_augmentation:
 ####################FE 추가 시 추가해야함
             assessmentItemID = self.assessmentItemID_list[index]
@@ -240,63 +236,41 @@ class DKTDataset(torch.utils.data.Dataset):
             #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
 
-            if self.args.model == 'lstmtrs':
-                now_assessmentItemID = assessmentItemID[1:]
-                now_testId = testId[1:]
-                now_KnowledgeTag = KnowledgeTag[1:]
-                now_answerCode = answerCode[1:]
-                
-                past_assessmentItemID = assessmentItemID[:-1]
-                past_testId = testId[:-1]
-                past_KnowledgeTag = KnowledgeTag[:-1]
-                past_answerCode = answerCode[:-1]
-                data = {
-                    "now_testId": torch.tensor(now_testId + 1, dtype=torch.int),
-                    "now_assessmentItemID": torch.tensor(now_assessmentItemID + 1, dtype=torch.int),
-                    "now_KnowledgeTag": torch.tensor(now_KnowledgeTag + 1, dtype=torch.int),
-                    "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
-                    #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
+    
+            cat_data = {
+            "testId": torch.tensor(testId + 1, dtype=torch.int),
+            "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
+            "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
+            "answerCode": torch.tensor(answerCode, dtype=torch.int),
+            #"userID" : torch.tensor(userID, dtype=torch.int),
+            #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+            }
 
-                    "past_testId": torch.tensor(past_testId + 1, dtype=torch.int),
-                    "past_assessmentItemID": torch.tensor(past_assessmentItemID + 1, dtype=torch.int),
-                    "past_KnowledgeTag": torch.tensor(past_KnowledgeTag + 1, dtype=torch.int),
-                    "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
-                    #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
-                }
-                seq_len = len(now_answerCode)
-                return data
-            
-            else:
-                data = {
-                "testId": torch.tensor(testId + 1, dtype=torch.int),
-                "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
-                "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
-                "answerCode": torch.tensor(answerCode, dtype=torch.int),
-                #"userID" : torch.tensor(userID, dtype=torch.int),
-                #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
-                }
-                seq_len = len(answerCode)
-
+            #cont_data = {
+                #New Feature = torch.tensor(New Feature, dtype=torch.float)
+            #}
+            seq_len = len(answerCode)
 
 ####################Mask 만들기
             if seq_len >= self.max_seq_len:
                 mask = torch.ones(self.max_seq_len, dtype=torch.int16)
             else:
-                for feature in data:
+                for feature in cat_data:
                     # Pre-padding non-valid sequences
                     tmp = torch.zeros(self.max_seq_len)
-                    tmp[self.max_seq_len-seq_len:] = data[feature]
-                    data[feature] = tmp
+                    tmp[self.max_seq_len-seq_len:] = cat_data[feature]
+                    cat_data[feature] = tmp
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
 
-            data["mask"] = mask
+            cat_data["mask"] = mask
 ####################Sliding Window 미적용 시
         else:
             row = self.grouped_value[index]
 ####################FE 추가 시 추가해야함
-            testId, assessmentItemID, KnowledgeTag, answerCode = row[0], row[1], row[2], row[3]
-            data = {
+            testId, assessmentItemID, KnowledgeTag, answerCode = row[0], row[1], row[2], row[3], ## row[4]....
+            
+            cat_data = {
                 "testId": torch.tensor(testId + 1, dtype=torch.int),
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
@@ -305,31 +279,43 @@ class DKTDataset(torch.utils.data.Dataset):
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
             
+            #cont_data = {
+                #New Feature = torch.tensor(New Feature, dtype=torch.float)
+            #}
+            
 ####################Mask 만들기       
             seq_len = len(answerCode)
 
             if seq_len > self.max_seq_len:
-                for k, seq in data.items():
-                    data[k] = seq[-self.max_seq_len:]
+                for k, seq in cat_data.items():
+                    cat_data[k] = seq[-self.max_seq_len:]
                 mask = torch.ones(self.max_seq_len, dtype=torch.int16)
             else:
-                for k, seq in data.items():
+                for k, seq in cat_data.items():
                     # Pre-padding non-valid sequences
                     tmp = torch.zeros(self.max_seq_len)
-                    tmp[self.max_seq_len-seq_len:] = data[k]
-                    data[k] = tmp
+                    tmp[self.max_seq_len-seq_len:] = cat_data[k]
+                    cat_data[k] = tmp
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
-            data["mask"] = mask
+            cat_data["mask"] = mask 
+            
         
 ####################Generate interaction
-        interaction = data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
+        interaction = cat_data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
         interaction = interaction.roll(shifts=1)
-        interaction_mask = data["mask"].roll(shifts=1)
+        interaction_mask = cat_data["mask"].roll(shifts=1)
         interaction_mask[0] = 0
         interaction = (interaction * interaction_mask).to(torch.int64)
-        data["interaction"] = interaction
-        data = {feature: feature_seq.int() for feature, feature_seq in data.items()}
+        cat_data["interaction"] = interaction
+        cat_data = {feature: feature_seq.int() for feature, feature_seq in cat_data.items()}
+
+        #cont_data = {feature: feature_seq.float() for feature, feature_seq in cont_data.items()}
+
+        data = {}
+        data['category'] = cat_data
+        #data['continous'] = cont_data
+        
         return data
 
     def __len__(self) -> int:
@@ -424,100 +410,26 @@ def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils
     pin_memory = False
     train_loader, valid_loader = None, None
 
-    if args.model == 'lstmtrs':
-        if train is not None:
-            trainset = DKTDataset(train, args)
-            train_loader = torch.utils.data.DataLoader(
-                trainset,
-                num_workers=args.num_workers,
-                shuffle=True,
-                batch_size=args.batch_size,
-                pin_memory=pin_memory,
-                collate_fn=sequence_collate,
-            )
-        if valid is not None:
-            valset = DKTDataset(valid, args)
-            valid_loader = torch.utils.data.DataLoader(
-                valset,
-                num_workers=args.num_workers,
-                shuffle=False,
-                batch_size=args.batch_size,
-                pin_memory=pin_memory,
-                collate_fn=sequence_collate,
-            )
-    else:
-        if train is not None:
-            trainset = DKTDataset(train, args)
-            train_loader = torch.utils.data.DataLoader(
-                trainset,
-                num_workers=args.num_workers,
-                shuffle=True,
-                batch_size=args.batch_size,
-                pin_memory=pin_memory,
-            )
-        if valid is not None:
-            valset = DKTDataset(valid, args)
-            valid_loader = torch.utils.data.DataLoader(
-                valset,
-                num_workers=args.num_workers,
-                shuffle=False,
-                batch_size=args.batch_size,
-                pin_memory=pin_memory,
-            )
+    if train is not None:
+        trainset = DKTDataset(train, args)
+        train_loader = torch.utils.data.DataLoader(
+            trainset,
+            num_workers=args.num_workers,
+            shuffle=True,
+            batch_size=args.batch_size,
+            pin_memory=pin_memory,
+        )
+    if valid is not None:
+        valset = DKTDataset(valid, args)
+        valid_loader = torch.utils.data.DataLoader(
+            valset,
+            num_workers=args.num_workers,
+            shuffle=False,
+            batch_size=args.batch_size,
+            pin_memory=pin_memory,
+        )
 
     return train_loader, valid_loader
 
-def pad_sequence(seq, max_len, padding_value = 0):
-    try:
-        seq_len, col = seq.shape
-        padding = np.zeros((max_len - seq_len, col)) + padding_value
-    except:
-        seq_len = seq.shape[0]
-        padding = np.zeros((max_len - seq_len, )) + padding_value
-
-    padding_seq = np.concatenate([padding, seq])
-
-    return padding_seq
 
 
-def sequence_collate(samples):
-    max_len = 0
-    for sample in samples:
-        seq_len = len(sample['past_testId'])
-        if max_len < seq_len:
-            max_len = seq_len
-
-    now_assessmentItemID = []
-    now_testId = []
-    now_KnowledgeTag = []
-    now_answerCode = []
-
-    past_assessmentItemID = []
-    past_testId = []
-    past_KnowledgeTag = []
-    past_answerCode = []
-
-    for sample in samples:
-        now_assessmentItemID += [pad_sequence(sample['now_assessmentItemID'] + 1, max_len = max_len, padding_value = 0)]
-        now_testId += [pad_sequence(sample['now_testId'] + 1, max_len = max_len, padding_value = 0)]
-        now_KnowledgeTag += [pad_sequence(sample['now_KnowledgeTag'] + 1, max_len = max_len, padding_value = 0)]
-        now_answerCode += [pad_sequence(sample['now_answerCode'], max_len = max_len, padding_value = -1)]
-
-        past_assessmentItemID += [pad_sequence(sample['past_assessmentItemID'] + 1, max_len = max_len, padding_value = 0)]
-        past_testId += [pad_sequence(sample['past_testId'] + 1, max_len = max_len, padding_value = 0)]
-        past_KnowledgeTag += [pad_sequence(sample['past_KnowledgeTag'] + 1, max_len = max_len, padding_value = 0)]
-        past_answerCode += [pad_sequence(sample['past_answerCode'] + 1, max_len = max_len, padding_value = 0)]    
-
-    return {
-            "now_testId": torch.tensor(now_testId, dtype=torch.int),
-            "now_assessmentItemID": torch.tensor(now_assessmentItemID, dtype=torch.int),
-            "now_KnowledgeTag": torch.tensor(now_KnowledgeTag, dtype=torch.int),
-            "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
-            #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
-
-            "past_testId": torch.tensor(past_testId, dtype=torch.int),
-            "past_assessmentItemID": torch.tensor(past_assessmentItemID, dtype=torch.int),
-            "past_KnowledgeTag": torch.tensor(past_KnowledgeTag, dtype=torch.int),
-            "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
-            #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
-            }

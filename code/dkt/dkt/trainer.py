@@ -113,11 +113,12 @@ def run(args,
 
 def run_kfold(args,
         kfolds: list):
-    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+    
 
     fold_weights = []
 
     for k, fold_dict in enumerate(kfolds):
+        model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
         logger.info("Start Training: Fold %s", k + 1)
         train_data = fold_dict['train']
         valid_data = fold_dict['val']
@@ -143,7 +144,7 @@ def run_kfold(args,
                                                     scheduler=scheduler, args=args)
 
             # VALID
-            auc, acc = validate(valid_loader=valid_loader, model=model, args=args)
+            auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
 
             wandb.log(dict(epoch=epoch,
                         train_loss_epoch=train_loss,
@@ -178,7 +179,9 @@ def run_kfold(args,
 
     average_weights = {}
     for key in fold_weights[0].keys():
-        average_weights[key] = torch.stack([fold[key] for fold in fold_weights], dim=0).mean(dim=0)
+        average_weights[key] = torch.stack([fold[key].float() for fold in fold_weights], dim=0).mean(dim=0)
+    for key in average_weights: average_weights[key].to(dtype = torch.int64)
+
     model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
     model.load_state_dict(average_weights)
 
@@ -241,7 +244,11 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     losses = []
     with torch.no_grad():
         for step, batch in enumerate(valid_loader):
-            batch = {k: v.to(args.device) for k, v in batch.items()}
+
+            for key in batch:
+                tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+                batch[key] = tmp
+        
             #preds = model(**batch)
             preds = model(batch)
             targets = batch["answerCode"]
@@ -289,6 +296,9 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
     with open(write_path, "w", encoding="utf8") as w:
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
+            ### thresholding
+            #if p > 0.5: p = 1
+            #else: p = 0
             w.write("{},{}\n".format(id, p))
     logger.info("Successfully saved submission as %s", write_path)
 

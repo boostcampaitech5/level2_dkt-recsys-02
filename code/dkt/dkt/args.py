@@ -53,6 +53,9 @@ def parse_args():
         "--graph_model", default="lgcn", type=str,  help="Which model to use"
     )
     parser.add_argument(
+        "--graph_dim", default=64, type=int,  help="Graph dim"
+    )
+    parser.add_argument(
         "--use_res", default=False, type=bool,  help="Use Residual Connection"
     )
     parser.add_argument(

@@ -120,3 +120,4 @@ def inference(model: nn.Module, data: dict, output_dir: str):
     write_path = os.path.join(output_dir, "submission.csv")
     pd.DataFrame({"prediction": pred}).to_csv(path_or_buf=write_path, index_label="id")
     logger.info("Successfully saved submission as %s", write_path)
+

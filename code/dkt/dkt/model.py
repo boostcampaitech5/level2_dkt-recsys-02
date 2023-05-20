@@ -13,7 +13,7 @@ import re
 class GraphEmbedding:
     def __init__(self, args, model):
         self.args = args
-        with open(f'/opt/ml/input/code/lightgcn/models_param/{model}_item_emb.pkl', 'rb') as f: 
+        with open(f'/opt/ml/input/code/lightgcn/models_param/{model}_item_emb_{args.graph_dim}.pkl', 'rb') as f: 
             item_emb_dic = pickle.load(f)
             
             item_emb = []
@@ -102,6 +102,8 @@ class ModelBase(nn.Module):
     def get_graph_emb_dim(self): return self.graph_emb_dim
 
     def dic_embed(self, input_dic):
+        
+        input_dic = input_dic['category']
         embed_list = []
         for feature, feature_seq in input_dic.items():
             if feature not in ('answerCode','mask'):
@@ -118,20 +120,23 @@ class ModelBase(nn.Module):
         return self.graph_emb.item_emb(seq.long())
     
     def dic_forward(self, input_dic):
+
+#######Category
+        input_cat = input_dic['category']
         embed_list = []
-        for feature, feature_seq in input_dic.items():
+        for feature, feature_seq in input_cat.items():
             batch_size = feature_seq.size(0)
             
             if feature not in ('answerCode','mask'):
                 embed_list.append(self.embedding_dict[feature](feature_seq.long()))
 
         if self.use_graph: 
-            embed_list.append(self.graph_emb.item_emb(input_dic['assessmentItemID'].long()))
+            embed_list.append(self.graph_emb.item_emb(input_cat['assessmentItemID'].long()))
 
         embed = torch.cat(embed_list, dim = 2)
         X = self.comb_proj(embed)
 
-
+#######Continous
 
         return X, batch_size
     
@@ -792,9 +797,9 @@ class TransLSTM_G(ModelBase):
             n_questions,
             n_tags
         )
-        self.n_heads = n_heads
-        self.dropout = drop_out
-        self.max_seq_len = max_seq_len
+        self.n_heads = self.args.n_heads
+        self.dropout = self.args.drop_out
+        self.max_seq_len = self.args.max_seq_len
 
         # Bert config
         self.graph_dim = super().get_graph_emb_dim()
@@ -809,7 +814,7 @@ class TransLSTM_G(ModelBase):
             hidden_size=self.hidden_dim,
             num_hidden_layers=self.n_layers,
             num_attention_heads=self.n_heads,
-            max_position_embeddings=max_seq_len,
+            max_position_embeddings=self.max_seq_len,
         )
         self.encoder = BertModel(self.config)
         self.transformer = nn.Transformer(

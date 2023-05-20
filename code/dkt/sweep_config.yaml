@@ -61,6 +61,8 @@ translstm_g:
       values: [16, 32, 64, 128, 256, 512, 1024]
     n_layers:
       values: [1, 2, 3, 4, 5]
+    graph_dim:
+      values: [64, 128, 256]
     drop_out:
       min: 0.0
       max: 0.5

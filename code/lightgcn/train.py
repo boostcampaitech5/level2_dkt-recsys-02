@@ -61,7 +61,7 @@ def main(args: argparse.Namespace):
             item_emb[feature_maping_info['assessmentItemID'][id]] = graph_emb[index]
 
 
-    with open('/opt/ml/input/code/lightgcn/models_param/lgcn_item_emb.pkl', 'wb') as f: pickle.dump(item_emb, f)
+    with open(f'/opt/ml/input/code/lightgcn/models_param/lgcn_item_emb_{args.hidden_dim}.pkl', 'wb') as f: pickle.dump(item_emb, f)
     #with open('/opt/ml/input/code/lightgcn/models_param/lgcn_user_emb.pkl', 'wb') as f: pickle.dump(user_emb, f)
 
 if __name__ == "__main__":
