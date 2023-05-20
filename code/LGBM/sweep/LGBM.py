@@ -58,13 +58,13 @@ def main(args):
     'KnowledgeTag': 'int16'
     }  
     DATA_PATH = '/opt/ml/input/data/'
-    df = pd.read_csv(DATA_PATH+'train_data.csv' , dtype=dtype, parse_dates=['Timestamp'])
+    df = pd.read_csv(DATA_PATH+'all_feature_2.csv' , dtype=dtype, parse_dates=['Timestamp'])
 
-    #2. FE
-    df = feature_engineering(df)
-    # elo관련 피쳐 3개 생성
-    for col in ['assessmentItemID','testId','KnowledgeTag']:
-        df = elo(df,col)
+    # #2. FE
+    # df = feature_engineering(df)
+    # # elo관련 피쳐 3개 생성
+    # for col in ['assessmentItemID','testId','KnowledgeTag']:
+    #     df = elo(df,col)
 
     # 사용할 Feature 설정
     FEATS = [
@@ -109,13 +109,13 @@ def main(args):
     }
 
     # 3. GroupKfold & train
-
+    df = df[df['dataset'] ==1]
     y_train = df['answerCode']
     train = df.drop(['answerCode'], axis=1)
 
     groups = train['userID']
-    fold_len = 2
-    gkf = GroupKFold(n_splits = 2)
+    fold_len = 5
+    gkf = GroupKFold(n_splits = 5)
 
     k_auc_list = []
     result_auc = 0
@@ -131,7 +131,7 @@ def main(args):
         valid_sets=[lgb_train,lgb_test],
         verbose_eval=100,
         early_stopping_rounds=100,
-        num_boost_round=500,
+        num_boost_round=1000,
         callbacks=[wandb.lightgbm.wandb_callback()]
     )
         wandb.lightgbm.log_summary(model, save_model_checkpoint=True)
@@ -158,7 +158,6 @@ def main(args):
         file.close()
             
         if output[args.model.lower()]['best_auc'] < kfold_auc:
-            pdb.set_trace()
             output[args.model.lower()]['best_auc'] = float(kfold_auc)
             output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             
@@ -181,7 +180,7 @@ if __name__ == "__main__":
 
         sweep_id = wandb.sweep(
             sweep=config[args.model.lower()],
-            project='LGBM'
+            project='LGBM',entity = 'recommy'
         )
         wandb_train_func = partial(main, args)
         wandb.agent(sweep_id, function=wandb_train_func, count=args.tuning_count)

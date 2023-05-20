@@ -218,7 +218,27 @@ class DKTDataset(torch.utils.data.Dataset):
                     r["KnowledgeTag"].values,
                     r["answerCode"].values,
                     #r[New Feature].values,
-                )
+                    r['user_correct_answer'].values, 
+                    r['user_total_answer'].values, 
+                    r['user_acc'].values,
+                    r['test_mean'].values, 
+                    r['test_sum'].values, 
+                    r['tag_mean'].values,
+                    r['tag_sum'].values,
+                    r['elapsed'].values,
+                    r['elapsed_cumsum'].values,
+                    r['month'].values,
+                    r['day'].values,
+                    r['hour'].values,
+                    r['dayname'].values,
+                    r['elapsed_med'].values,
+                    r['bigclass'].values,
+                    r['bigclasstime'].values,
+                    r['bigclass_acc'].values,
+                    r['bigclass_sum'].values,
+                    r['bigclass_count'].values,
+                    r['elo'].values
+                 )
             )
         ).values
         
@@ -239,6 +259,26 @@ class DKTDataset(torch.utils.data.Dataset):
             answerCode = self.answerCode_list[index]
             #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
+            user_correct_answer = self.user_correct_answer_list[index]
+            user_total_answer = self.user_total_answer_list[index]
+            user_acc = self.user_acc_list[index]
+            test_mean = self.test_mean_list[index]
+            test_sum = self.test_sum_list[index]
+            tag_mean = self.tag_mean_list[index]
+            tag_sum = self.tag_sum_list[index]
+            elapsed = self.elapsed_list[index]
+            elapsed_cumsum = self.elapsed_cumsum_index[index]
+            elasped_med = self.elapsed_med_index[index]
+            month = self.month_list[index]
+            day = self.day_list[index]
+            hour = self.hour_list[index]
+            dayname = self.dayname_list[index]
+            bigclass = self.bigclass_list[index]
+            bigclasstime = self.bigclasstime_list[index]
+            bigclass_acc = self.bigclass_acc_list[index]
+            bigclass_sum = self.bigclass_sum_list[index]
+            bigclass_count = self.bigclass_count_list[index]
+            elo = self.elo_list[index]
 
             if self.args.model == 'lstmtrs':
                 now_assessmentItemID = assessmentItemID[1:]
@@ -256,12 +296,50 @@ class DKTDataset(torch.utils.data.Dataset):
                     "now_KnowledgeTag": torch.tensor(now_KnowledgeTag + 1, dtype=torch.int),
                     "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
                     #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
+                    "now_user_correct_answer" : torch.tensor(now_user_correct_answer + 1, dtype=torch.int),
+                    "now_user_total_answer" : torch.tensor(now_user_total_answer + 1, dtype=torch.int),
+                    "now_user_acc" : torch.tensor(now_user_acc + 1, dtype=torch.int),
+                    "now_test_mean" : torch.tensor(now_test_mean + 1, dtype=torch.int),
+                    "now_test_sum" : torch.tensor(now_test_sum + 1, dtype=torch.int),
+                    "now_tag_mean" : torch.tensor(now_tag_mean + 1, dtype=torch.int),
+                    "now_tag_sum" : torch.tensor(now_tag_sum + 1, dtype=torch.int),
+                    "now_elapsed" : torch.tensor(now_elapsed + 1, dtype=torch.int),
+                    "now_elasped_cumsum" : torch.tensor(now_elapsed_cumsum + 1, dtype=torch.int),
+                    "now_elasped_med" : torch.tensor(now_elapsed_med + 1, dtype=torch.int),
+                    "now_month" : torch.tensor(now_month + 1, dtype=torch.int),
+                    "now_day" : torch.tensor(now_day + 1, dtype=torch.int),
+                    "now_hour" : torch.tensor(now_hour + 1, dtype=torch.int),
+                    "now_dayname" : torch.tensor(now_dayname + 1, dtype=torch.int),
+                    "now_bigclass" : torch.tensor(now_bigclass +1 , dtype=torch.int),
+                    "now_bigclass_acc" : torch.tensor(now_bigclass_acc + 1, dtype=torch.int),
+                    "now_bigclass_sum" : torch.tensor(now_bigclass_sum + 1, dtype=torch.int),
+                    "now_bigclass_count" : torch.tensor(now_bigclass_count + 1, dtype=torch.int),
+                    "now_elo" : torch.tensor(now_elo + 1, dtype=torch.int),
 
                     "past_testId": torch.tensor(past_testId + 1, dtype=torch.int),
                     "past_assessmentItemID": torch.tensor(past_assessmentItemID + 1, dtype=torch.int),
                     "past_KnowledgeTag": torch.tensor(past_KnowledgeTag + 1, dtype=torch.int),
                     "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
                     #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
+                    "past_user_correct_answer" : torch.tensor(past_user_correct_answer + 1, dtype=torch.int),
+                    "past_user_total_answer" : torch.tensor(past_user_total_answer + 1, dtype=torch.int),
+                    "past_user_acc" : torch.tensor(past_user_acc + 1, dtype=torch.int),
+                    "past_test_mean" : torch.tensor(past_test_mean + 1, dtype=torch.int),
+                    "past_test_sum" : torch.tensor(past_test_sum + 1, dtype=torch.int),
+                    "past_tag_mean" : torch.tensor(past_tag_mean + 1, dtype=torch.int),
+                    "past_tag_sum" : torch.tensor(past_tag_sum + 1, dtype=torch.int),
+                    "past_elapsed" : torch.tensor(past_elapsed + 1, dtype=torch.int),
+                    "past_elasped_cumsum" : torch.tensor(past_elapsed_cumsum + 1, dtype=torch.int),
+                    "past_elasped_med" : torch.tensor(past_elapsed_med + 1, dtype=torch.int),
+                    "past_month" : torch.tensor(past_month + 1, dtype=torch.int),
+                    "past_day" : torch.tensor(past_day + 1, dtype=torch.int),
+                    "past_hour" : torch.tensor(past_hour + 1, dtype=torch.int),
+                    "past_dayname" : torch.tensor(past_dayname + 1, dtype=torch.int),
+                    "past_bigclass" : torch.tensor(past_bigclass + 1, dtype=torch.int),
+                    "past_bigclass_acc" : torch.tensor(past_bigclass_acc + 1, dtype=torch.int),
+                    "past_bigclass_sum" : torch.tensor(past_bigclass_sum + 1, dtype=torch.int),
+                    "past_bigclass_count" : torch.tensor(past_bigclass_count + 1, dtype=torch.int),
+                    "past_elo" : torch.tensor(past_elo + 1, dtype=torch.int)
                 }
                 seq_len = len(now_answerCode)
                 return data
@@ -274,6 +352,25 @@ class DKTDataset(torch.utils.data.Dataset):
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
                 #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+                "user_correct_answer" : torch.tensor(user_correct_answer + 1, dtype=torch.int),
+                "user_total_answer" : torch.tensor(user_total_answer + 1, dtype=torch.int),
+                "user_acc" : torch.tensor(user_acc + 1, dtype=torch.int),
+                "test_mean" : torch.tensor(test_mean + 1, dtype=torch.int),
+                "test_sum" : torch.tensor(test_sum + 1, dtype=torch.int),
+                "tag_mean" : torch.tensor(tag_mean + 1, dtype=torch.int),
+                "tag_sum" : torch.tensor(tag_sum + 1, dtype=torch.int),
+                "elapsed" : torch.tensor(elapsed + 1, dtype=torch.int),
+                "elapsed_cumsum" : torch.tensor(elapsed_cumsum + 1, dtype=torch.int),
+                "elasped_med" : torch.tensor(elapsed_med + 1, dtype=torch.int),
+                "month" : torch.tensor(month + 1, dtype=torch.int),
+                "day" : torch.tensor(day + 1, dtype=torch.int),
+                "hour" : torch.tensor(hour + 1, dtype=torch.int),
+                "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
+                "bigclass" : torch.tensor(bigclass + 1, dtype=torch.int),
+                "bigclass_acc" : torch.tensor(bigclass_acc + 1, dtype=torch.int),
+                "bigclass_sum" : torch.tensor(bigclass_sum + 1, dtype=torch.int),
+                "bigclass_count" : torch.tensor(bigclass_count + 1, dtype=torch.int),
+                "elo" : torch.tensor(elo + 1, dtype=torch.int)
                 }
                 seq_len = len(answerCode)
 
@@ -303,6 +400,25 @@ class DKTDataset(torch.utils.data.Dataset):
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
                 #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+                "user_correct_answer" : torch.tensor(user_correct_answer + 1, dtype=torch.int),
+                "user_total_answer" : torch.tensor(user_total_answer + 1, dtype=torch.int),
+                "user_acc" : torch.tensor(user_acc + 1, dtype=torch.int),
+                "test_mean" : torch.tensor(test_mean + 1, dtype=torch.int),
+                "test_sum" : torch.tensor(test_sum + 1, dtype=torch.int),
+                "tag_mean" : torch.tensor(tag_mean + 1, dtype=torch.int),
+                "tag_sum" : torch.tensor(tag_sum + 1, dtype=torch.int),
+                "elapsed" : torch.tensor(elapsed + 1, dtype=torch.int),
+                "elapsed_cumsum" : torch.tensor(elapsed_cumsum + 1, dtype=torch.int),
+                "elasped_med" : torch.tensor(elapsed_med + 1, dtype=torch.int),
+                "month" : torch.tensor(month + 1, dtype=torch.int),
+                "day" : torch.tensor(day + 1, dtype=torch.int),
+                "hour" : torch.tensor(hour + 1, dtype=torch.int),
+                "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
+                "bigclass" : torch.tensor(bigclass + 1, dtype=torch.int),
+                "bigclass_acc" : torch.tensor(bigclass_acc + 1, dtype=torch.int),
+                "bigclass_sum" : torch.tensor(bigclass_sum + 1, dtype=torch.int),
+                "bigclass_count" : torch.tensor(bigclass_count + 1, dtype=torch.int),
+                "elo" : torch.tensor(elo + 1, dtype=torch.int)
                 }
             
 ####################Mask 만들기       
@@ -372,6 +488,26 @@ class DKTDataset(torch.utils.data.Dataset):
         answerCode_list = []
         #New Feature_list = []
         #userID_list = []
+        user_correct_answer_list = []
+        user_total_answer_list = []
+        user_acc_list = []
+        test_mean_list = []
+        test_sum_list = []
+        tag_mean_list = []
+        tag_sum_list = []
+        elapsed_list = []
+        elapsed_cumsum_list = []
+        month_list = []
+        day_list = []
+        hour_list = []
+        dayname_list = []
+        elapsed_med_list = []
+        bigclass_list = []
+        bigclasstime_list = []
+        bigclass_acc_list = []
+        bigclass_sum_list = []
+        bigclass_count_list = []
+        elo_list = []
         print('---------Applying Sliding Window---------')
         for userID, user_seq in tqdm(self.grouped_df):
             assessmentItemID = user_seq['assessmentItemID'].values[::-1]
@@ -379,7 +515,26 @@ class DKTDataset(torch.utils.data.Dataset):
             KnowledgeTag = user_seq['KnowledgeTag'].values[::-1]
             answerCode = user_seq['answerCode'].values[::-1]
             #New Feature = user_seq['New Feature'].values[::-1]
-
+            user_correct_answer = user_seq['user_correct_answer'].values[::-1]
+            user_total_answer = user_seq['user_total_answer'].values[::-1]
+            user_acc = user_seq['user_acc'].values[::-1]
+            test_mean = user_seq['test_mean'].values[::-1]
+            test_sum = user_seq['test_sum'].values[::-1]
+            tag_mean = user_seq['tag_mean'].values[::-1]
+            tag_sum = user_seq['tag_sum'].values[::-1]
+            elapsed = user_seq['elapsed'].values[::-1]
+            elapsed_cumsum = user_seq['elapsed_cumsum'].values[::-1]
+            month = user_seq['month'].values[::-1]
+            day = user_seq['day'].values[::-1]
+            hour = user_seq['hour'].values[::-1]
+            dayname = user_seq['dayname'].values[::-1]
+            elapsed_med = user_seq['elapsed_med'].values[::-1]
+            bigclass = user_seq['bigclass'].values[::-1]
+            bigclasstime = user_seq['bigclasstime'].values[::-1]
+            bigclass_acc = user_seq['bigclass_acc'].values[::-1]
+            bigclass_sum = user_seq['bigclass_sum'].values[::-1]
+            bigclass_count = user_seq['bigclass_count'].values[::-1]
+            elo = user_seq['elo'].values[::-1]
             start_idx = 0
             if len(user_seq) <= self.max_seq_len:
                 ######FE시에 추가해야함
@@ -388,14 +543,54 @@ class DKTDataset(torch.utils.data.Dataset):
                     testId_list = self.shuffle(testId_list,  testId[::-1])
                     KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[::-1])
                     answerCode_list = self.shuffle(answerCode_list,  answerCode[::-1])
-                    #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])
+                    #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])      
+                    user_correct_answer_list = self.shuffle(user_correct_answer_list, user_correct_answer[::-1])
+                    user_total_answer_list = self.shuffle(user_total_answer_list, user_total_answer[::-1])
+                    user_acc_list = self.shuffle(user_acc_list, user_acc[::-1])
+                    test_mean_list = self.shuffle(test_mean_list, test_mean[::-1])
+                    test_sum_list = self.shuffle(test_sum_list, test_sum[::-1])
+                    tag_mean_list = self.shuffle(tag_mean_list, tag_mean[::-1])
+                    tag_sum_list = self.shuffle(tag_sum_list, tag_sum[::-1])
+                    elapsed_list = self.shuffle(elapsed_list, elapsed[::-1])
+                    elapsed_cumsum_list = self.shuffle(elapsed_cumsum_list, elapsed_cumsum[::-1])
+                    month_list = self.shuffle(month_list, month[::-1])
+                    day_list = self.shuffle(day_list, day[::-1])
+                    hour_list = self.shuffle(hour_list, hour[::-1])
+                    dayname_list = self.shuffle(dayname_list, dayname[::-1])
+                    elapsed_med_list = self.shuffle(elapsed_med_list, elapsed_med[::-1])
+                    bigclass_list = self.shuffle(bigclass_list, bigclass[::-1])
+                    bigclasstime_list = self.shuffle(bigclasstime_list, bigclasstime[::-1])
+                    bigclass_acc_list = self.shuffle(bigclass_acc_list, bigclass_acc[::-1])
+                    bigclass_sum_list = self.shuffle(bigclass_sum_list, bigclass_sum[::-1])
+                    bigclass_count_list = self.shuffle(bigclass_count_list, bigclass_count[::-1])
+                    elo_list = self.shuffle(elo_list, elo[::-1])
                 else:
                     assessmentItemID_list.append(assessmentItemID[::-1])
                     testId_list.append(testId[::-1])
                     KnowledgeTag_list.append(KnowledgeTag[::-1])
                     answerCode_list.append(answerCode[::-1])
                     #New Feature_list.append(New Feature[::-1])
-                #userID_list.append([userID]* len(answerCode[::-1]))
+                    #userID_list.append([userID]* len(answerCode[::-1
+                    user_correct_answer_list.append(user_correct_answer[::-1])
+                    user_total_answer_list.append(user_total_answer[::-1])
+                    user_acc_list.append(user_acc[::-1])
+                    test_mean_list.append(test_mean[::-1])
+                    test_sum_list.append(test_sum[::-1])
+                    tag_mean_list.append(tag_mean[::-1])
+                    tag_sum_list.append(tag_sum[::-1])
+                    elapsed_list.append(elapsed[::-1])
+                    elapsed_cumsum_list.append(elapsed_cumsum[::-1])
+                    month_list.append(month[::-1])
+                    day_list.append(day[::-1])
+                    hour_list.append(hour[::-1])
+                    dayname_list.append(dayname[::-1])
+                    elapsed_med_list.append(elapsed_med[::-1])
+                    bigclass_list.append(bigclass[::-1])
+                    bigclasstime_list.append(bigclasstime[::-1])
+                    bigclass_acc_list.append(bigclass_acc[::-1])
+                    bigclass_sum_list.append(bigclass_sum[::-1])
+                    bigclass_count_list.append(bigclass_count[::-1])
+                    elo_list.append(elo[::-1])
             else:
                 stop = False
                 while stop == False:
@@ -408,6 +603,27 @@ class DKTDataset(torch.utils.data.Dataset):
                         KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list = self.shuffle(answerCode_list,  answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list = self.shuffle(New Feature_list,  New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                        user_correct_answer_list = self.shuffle(user_correct_answer_list, user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1])
+                        user_total_answer_list = self.shuffle(user_total_answer_list, user_total_answer[start_idx: start_idx + self.max_seq_len][::-1])
+                        user_acc_list = self.shuffle(user_acc_list, user_acc[start_idx: start_idx + self.max_seq_len][::-1])
+                        test_mean_list = self.shuffle(test_mean_list, test_mean[start_idx: start_idx + self.max_seq_len][::-1])
+                        test_sum_list = self.shuffle(test_sum_list, test_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        tag_mean_list = self.shuffle(tag_mean_list, tag_mean[start_idx: start_idx + self.max_seq_len][::-1])
+                        tag_sum_list = self.shuffle(tag_sum_list, tag_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_list = self.shuffle(elapsed_list, elapsed[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_cumsum_list = self.shuffle(elapsed_cumsum_list, elapsed_cumsum[start_idx: start_idx + self.max_seq_len][::-1])
+                        month_list = self.shuffle(month_list, month[start_idx: start_idx + self.max_seq_len][::-1])
+                        day_list = self.shuffle(day_list, day[start_idx: start_idx + self.max_seq_len][::-1])
+                        hour_list = self.shuffle(hour_list, hour[start_idx: start_idx + self.max_seq_len][::-1])
+                        dayname_list = self.shuffle(dayname_list, dayname[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_med_list = self.shuffle(elapsed_med_list, elapsed_med[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_list = self.shuffle(bigclass_list, bigclass[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclasstime_list = self.shuffle(bigclasstime_list, bigclasstime[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_acc_list = self.shuffle(bigclass_acc_list, bigclass_acc[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_sum_list = self.shuffle(bigclass_sum_list, bigclass_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_count_list = self.shuffle(bigclass_count_list, bigclass_count[start_idx: start_idx + self.max_seq_len][::-1])
+                        elo_list = self.shuffle(elo_list, elo[start_idx: start_idx + self.max_seq_len][::-1])
+
                     else:
                         assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
                         testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
@@ -415,10 +631,30 @@ class DKTDataset(torch.utils.data.Dataset):
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     #userID_list.append([userID]* len(answerCode[::-1]))
+                    user_correct_answer_list = user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1]
+user_total_answer_list = user_total_answer[start_idx: start_idx + self.max_seq_len][::-1]
+user_acc_list = user_acc[start_idx: start_idx + self.max_seq_len][::-1]
+test_mean_list = test_mean[start_idx: start_idx + self.max_seq_len][::-1]
+test_sum_list = test_sum[start_idx: start_idx + self.max_seq_len][::-1]
+tag_mean_list = tag_mean[start_idx: start_idx + self.max_seq_len][::-1]
+tag_sum_list = tag_sum[start_idx: start_idx + self.max_seq_len][::-1]
+elapsed_list = elapsed[start_idx: start_idx + self.max_seq_len][::-1]
+elapsed_cumsum_list = elapsed_cumsum[start_idx: start_idx + self.max_seq_len][::-1]
+month_list = month[start_idx: start_idx + self.max_seq_len][::-1]
+day_list = day[start_idx: start_idx + self.max_seq_len][::-1]
+hour_list = hour[start_idx: start_idx + self.max_seq_len][::-1]
+dayname_list = dayname[start_idx: start_idx + self.max_seq_len][::-1]
+elapsed_med_list = elapsed_med[start_idx: start_idx + self.max_seq_len][::-1]
+bigclass_list = bigclass[start_idx: start_idx + self.max_seq_len][::-1]
+bigclasstime_list = bigclasstime[start_idx: start_idx + self.max_seq_len][::-1]
+bigclass_acc_list = bigclass_acc[start_idx: start_idx + self.max_seq_len][::-1]
+bigclass_sum_list = bigclass_sum[start_idx: start_idx + self.max_seq_len][::-1]
+bigclass_count_list = bigclass_count[start_idx: start_idx + self.max_seq_len][::-1]
+elo_list = elo[start_idx: start_idx + self.max_seq_len][::-1]
                     start_idx += self.window
 
         ######FE시에 추가해야함
-        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list #New Feature_list
+        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list user_correct_answer_list, user_total_answer_list, user_acc_list, test_mean_list, test_sum_list, tag_mean_list, tag_sum_list, elapsed_list, elapsed_cumsum_list, month_list, day_list, hour_list, dayname_list, elapsed_med_list, bigclass_list, bigclasstime_list, bigclass_acc_list, bigclass_sum_list, bigclass_count_list, elo_list #New Feature_list
 
 def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils.data.DataLoader]:
     pin_memory = False
@@ -491,33 +727,154 @@ def sequence_collate(samples):
     now_testId = []
     now_KnowledgeTag = []
     now_answerCode = []
+    now_user_correct_answer = []
+    now_user_total_answer = []
+    now_user_acc = []
+    now_test_mean = []
+    now_test_sum = []
+    now_tag_mean = []
+    now_tag_sum = []
+    now_elapsed = []
+    now_elapsed_cumsum = []
+    now_month = []
+    now_day = []
+    now_hour = []
+    now_dayname = []
+    now_elapsed_med = []
+    now_bigclass = []
+    now_bigclasstime = []
+    now_bigclass_acc = []
+    now_bigclass_sum = []
+    now_bigclass_count = []
+    now_elo = []
 
     past_assessmentItemID = []
     past_testId = []
     past_KnowledgeTag = []
     past_answerCode = []
+    past_user_correct_answer = []
+    past_user_total_answer = []
+    past_user_acc = []
+    past_test_mean = []
+    past_test_sum = []
+    past_tag_mean = []
+    past_tag_sum = []
+    past_elapsed = []
+    past_elapsed_cumsum = []
+    past_month = []
+    past_day = []
+    past_hour = []
+    past_dayname = []
+    past_elapsed_med = []
+    past_bigclass = []
+    past_bigclasstime = []
+    past_bigclass_acc = []
+    past_bigclass_sum = []
+    past_bigclass_count = []
+    past_elo = []
 
     for sample in samples:
         now_assessmentItemID += [pad_sequence(sample['now_assessmentItemID'] + 1, max_len = max_len, padding_value = 0)]
         now_testId += [pad_sequence(sample['now_testId'] + 1, max_len = max_len, padding_value = 0)]
         now_KnowledgeTag += [pad_sequence(sample['now_KnowledgeTag'] + 1, max_len = max_len, padding_value = 0)]
         now_answerCode += [pad_sequence(sample['now_answerCode'], max_len = max_len, padding_value = -1)]
+        now_user_correct_answer += [pad_sequence(sample['now_user_correct_answer'] + 1, max_len=max_len, padding_value=0)]
+        now_user_total_answer += [pad_sequence(sample['now_user_total_answer'] + 1, max_len=max_len, padding_value=0)]
+        now_user_acc += [pad_sequence(sample['now_user_acc'] + 1, max_len=max_len, padding_value=0)]
+        now_test_mean += [pad_sequence(sample['now_test_mean'] + 1, max_len=max_len, padding_value=0)]
+        now_test_sum += [pad_sequence(sample['now_test_sum'] + 1, max_len=max_len, padding_value=0)]
+        now_tag_mean += [pad_sequence(sample['now_tag_mean'] + 1, max_len=max_len, padding_value=0)]
+        now_tag_sum += [pad_sequence(sample['now_tag_sum'] + 1, max_len=max_len, padding_value=0)]
+        now_elapsed += [pad_sequence(sample['now_elapsed'] + 1, max_len=max_len, padding_value=0)]
+        now_elapsed_cumsum += [pad_sequence(sample['now_elapsed_cumsum'] + 1, max_len=max_len, padding_value=0)]
+        now_month += [pad_sequence(sample['now_month'] + 1, max_len=max_len, padding_value=0)]
+        now_day += [pad_sequence(sample['now_day'] + 1, max_len=max_len, padding_value=0)]
+        now_hour += [pad_sequence(sample['now_hour'] + 1, max_len=max_len, padding_value=0)]
+        now_dayname += [pad_sequence(sample['now_dayname'] + 1, max_len=max_len, padding_value=0)]
+        now_elapsed_med += [pad_sequence(sample['now_elapsed_med'] + 1, max_len=max_len, padding_value=0)]
+        now_bigclass += [pad_sequence(sample['now_bigclass'] + 1, max_len=max_len, padding_value=0)]
+        now_bigclasstime += [pad_sequence(sample['now_bigclasstime'] + 1, max_len=max_len, padding_value=0)]
+        now_bigclass_acc += [pad_sequence(sample['now_bigclass_acc'] + 1, max_len=max_len, padding_value=0)]
+        now_bigclass_sum += [pad_sequence(sample['now_bigclass_sum'] + 1, max_len=max_len, padding_value=0)]
+        now_bigclass_count += [pad_sequence(sample['now_bigclass_count'] + 1, max_len=max_len, padding_value=0)]
+        now_elo += [pad_sequence(sample['now_elo'] + 1, max_len=max_len, padding_value=0)]
+
 
         past_assessmentItemID += [pad_sequence(sample['past_assessmentItemID'] + 1, max_len = max_len, padding_value = 0)]
         past_testId += [pad_sequence(sample['past_testId'] + 1, max_len = max_len, padding_value = 0)]
         past_KnowledgeTag += [pad_sequence(sample['past_KnowledgeTag'] + 1, max_len = max_len, padding_value = 0)]
         past_answerCode += [pad_sequence(sample['past_answerCode'] + 1, max_len = max_len, padding_value = 0)]    
-
+        past_user_correct_answer += [pad_sequence(sample['past_user_correct_answer'] + 1, max_len=max_len, padding_value=0)]
+        past_user_total_answer += [pad_sequence(sample['past_user_total_answer'] + 1, max_len=max_len, padding_value=0)]
+        past_user_acc += [pad_sequence(sample['past_user_acc'] + 1, max_len=max_len, padding_value=0)]
+        past_test_mean += [pad_sequence(sample['past_test_mean'] + 1, max_len=max_len, padding_value=0)]
+        past_test_sum += [pad_sequence(sample['past_test_sum'] + 1, max_len=max_len, padding_value=0)]
+        past_tag_mean += [pad_sequence(sample['past_tag_mean'] + 1, max_len=max_len, padding_value=0)]
+        past_tag_sum += [pad_sequence(sample['past_tag_sum'] + 1, max_len=max_len, padding_value=0)]
+        past_elapsed += [pad_sequence(sample['past_elapsed'] + 1, max_len=max_len, padding_value=0)]
+        past_elapsed_cumsum += [pad_sequence(sample['past_elapsed_cumsum'] + 1, max_len=max_len, padding_value=0)]
+        past_month += [pad_sequence(sample['past_month'] + 1, max_len=max_len, padding_value=0)]
+        past_day += [pad_sequence(sample['past_day'] + 1, max_len=max_len, padding_value=0)]
+        past_hour += [pad_sequence(sample['past_hour'] + 1, max_len=max_len, padding_value=0)]
+        past_dayname += [pad_sequence(sample['past_dayname'] + 1, max_len=max_len, padding_value=0)]
+        past_elapsed_med += [pad_sequence(sample['past_elapsed_med'] + 1, max_len=max_len, padding_value=0)]
+        past_bigclass += [pad_sequence(sample['past_bigclass'] + 1, max_len=max_len, padding_value=0)]
+        past_bigclasstime += [pad_sequence(sample['past_bigclasstime'] + 1, max_len=max_len, padding_value=0)]
+        past_bigclass_acc += [pad_sequence(sample['past_bigclass_acc'] + 1, max_len=max_len, padding_value=0)]
+        past_bigclass_sum += [pad_sequence(sample['past_bigclass_sum'] + 1, max_len=max_len, padding_value=0)]
+        past_bigclass_count += [pad_sequence(sample['past_bigclass_count'] + 1, max_len=max_len, padding_value=0)]
+        past_elo += [pad_sequence(sample['past_elo'] + 1, max_len=max_len, padding_value=0)]
     return {
             "now_testId": torch.tensor(now_testId, dtype=torch.int),
             "now_assessmentItemID": torch.tensor(now_assessmentItemID, dtype=torch.int),
             "now_KnowledgeTag": torch.tensor(now_KnowledgeTag, dtype=torch.int),
             "now_answerCode": torch.tensor(now_answerCode, dtype=torch.int),
             #"now_New Feature": torch.tensor(now_New Feature, dtype=torch.int),
-
+            "now_user_correct_answer": torch.tensor(now_user_correct_answer, dtype=torch.int),
+            "now_user_total_answer": torch.tensor(now_user_total_answer, dtype=torch.int),
+            "now_user_acc": torch.tensor(now_user_acc, dtype=torch.float),
+            "now_test_mean": torch.tensor(now_test_mean, dtype=torch.float),
+            "now_test_sum": torch.tensor(now_test_sum, dtype=torch.float),
+            "now_tag_mean": torch.tensor(now_tag_mean, dtype=torch.float),
+            "now_tag_sum": torch.tensor(now_tag_sum, dtype=torch.float),
+            "now_elapsed": torch.tensor(now_elapsed, dtype=torch.float),
+            "now_elapsed_cumsum": torch.tensor(now_elapsed_cumsum, dtype=torch.float),
+            "now_month": torch.tensor(now_month, dtype=torch.int),
+            "now_day": torch.tensor(now_day, dtype=torch.int),
+            "now_hour": torch.tensor(now_hour, dtype=torch.int),
+            "now_dayname": torch.tensor(now_dayname, dtype=torch.int),
+            "now_elapsed_med": torch.tensor(now_elapsed_med, dtype=torch.float),
+            "now_bigclass": torch.tensor(now_bigclass, dtype=torch.int),
+            "now_bigclasstime": torch.tensor(now_bigclasstime, dtype=torch.int),
+            "now_bigclass_acc": torch.tensor(now_bigclass_acc, dtype=torch.float),
+            "now_bigclass_sum": torch.tensor(now_bigclass_sum, dtype=torch.int),
+            "now_bigclass_count": torch.tensor(now_bigclass_count, dtype=torch.int),
+            "now_elo": torch.tensor(now_elo, dtype=torch.float)
+        
+        
             "past_testId": torch.tensor(past_testId, dtype=torch.int),
             "past_assessmentItemID": torch.tensor(past_assessmentItemID, dtype=torch.int),
             "past_KnowledgeTag": torch.tensor(past_KnowledgeTag, dtype=torch.int),
             "past_answerCode": torch.tensor(past_answerCode, dtype=torch.int),
             #"past_New Feature": torch.tensor(past_New Feature, dtype=torch.int),
+            "past_user_correct_answer": torch.tensor(past_user_correct_answer, dtype=torch.int),
+            "past_user_total_answer": torch.tensor(past_user_total_answer, dtype=torch.int),
+            "past_user_acc": torch.tensor(past_user_acc, dtype=torch.float),
+            "past_test_mean": torch.tensor(past_test_mean, dtype=torch.float),
+            "past_test_sum": torch.tensor(past_test_sum, dtype=torch.float),
+            "past_tag_mean": torch.tensor(past_tag_mean, dtype=torch.float),
+            "past_tag_sum": torch.tensor(past_tag_sum, dtype=torch.float),
+            "past_elapsed": torch.tensor(past_elapsed, dtype=torch.float),
+            "past_elapsed_cumsum": torch.tensor(past_elapsed_cumsum, dtype=torch.float),
+            "past_month": torch.tensor(past_month, dtype=torch.int),
+            "past_day": torch.tensor(past_day, dtype=torch.int),
+            "past_hour": torch.tensor(past_hour, dtype=torch.int),
+            "past_dayname": torch.tensor(past_dayname, dtype=torch.int),
+            "past_elapsed_med": torch.tensor(past_elapsed_med, dtype=torch.float),
+            "past_bigclass": torch.tensor(past_bigclass, dtype=torch.int),
+            "past_bigclasstime": torch.tensor(past_bigclasstime, dtype=torch.int),
+            "past_bigclass_acc": torch.tensor(past_bigclass_acc, dtype=torch.float),
+            "past_bigclass_sum": torch.tensor(past_bigclass_sum, dtype=torch.int),
+            "past_bigclass_count": torch.tensor(past_bigclass_count, dtype=torch.int),
+            "past_elo": torch.tensor(past_elo, dtype=torch.float)
             }
