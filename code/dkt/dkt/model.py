@@ -13,7 +13,7 @@ from .layer import SASRecBlock, PositionalEncoding
 class GraphEmbedding:
     def __init__(self, args, model):
         self.args = args
-        with open(f'/opt/ml/input/code/lightgcn/models_param/{model}_item_emb.pkl', 'rb') as f: 
+        with open(f'/opt/ml/input/kys2/level2_dkt-recsys-02/code/lightgcn/models_param/{model}_item_emb.pkl', 'rb') as f: 
             item_emb_dic = pickle.load(f)
             
             item_emb = []
