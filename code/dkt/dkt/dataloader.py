@@ -124,8 +124,8 @@ class Preprocess:
 
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
         
-        current_dir = os.getcwd()  
-        with open('/opt/level2_dkt-recsys-02/code/dkt/models_paramfeature_mapper.pkl', 'wb') as f: 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../models_paramfeature_mapper.pkl', 'wb') as f: 
             pickle.dump(feature_maping_info, f)
         return df
 

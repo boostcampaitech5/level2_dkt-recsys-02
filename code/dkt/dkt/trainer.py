@@ -98,15 +98,16 @@ def run(args,
             'val_acc': val_acc_avg,
         })
         
-        with open('./sweep_best_auc.yaml') as file:
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../sweep_best_auc.yaml') as file:
             output = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
             
         if output[args.model.lower()]['best_auc'] < val_auc_avg:
             output[args.model.lower()]['best_auc'] = float(val_auc_avg)
-            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(float, dict(wandb.config).values())))
+            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             
-        with open('./sweep_best_auc.yaml', 'w') as file:
+        with open(curr_dir + '../sweep_best_auc.yaml', 'w') as file:
             yaml.dump(output, file, default_flow_style=False)
         file.close()
 
