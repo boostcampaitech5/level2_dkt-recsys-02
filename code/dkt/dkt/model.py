@@ -9,6 +9,7 @@ import pickle
 import torch.nn.init as init
 from .layer import SASRecBlock, PositionalEncoding, Feed_Forward_block
 import re
+import json
 
 class GraphEmbedding:
     def __init__(self, args, model):
@@ -48,52 +49,62 @@ class ModelBase(nn.Module):
 
         super().__init__()
         self.args = args
+        self.max_seq_len = self.args.max_seq_len
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
+        self.resize_factor = self.args.resize_factor
 
-        ##Residual Connection
+        with open(f'/opt/level2_dkt-recsys-02/code/dkt/models_param/num_feature.json', 'r') as f:
+            self.num_feature =  json.load(f)
+        
+
+
+
+########Residual Connection
         self.residual_connection = self.args.use_res
 
-        ##Graph Embedding\
+########Graph Embedding\
         self.use_graph = self.args.use_graph
-
         if self.use_graph:
             self.graph_emb = GraphEmbedding(args, self.args.graph_model)
             self.graph_emb_dim = self.graph_emb.emb_dim
 
-        # Embeddings
+######### Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
-        hd, intd = hidden_dim, hidden_dim // 3
+        hd, intd = hidden_dim, hidden_dim // self.resize_factor
+
         self.embedding_interaction = nn.Embedding(3, intd) # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_test = nn.Embedding(n_tests + 1, intd)
         self.embedding_question = nn.Embedding(n_questions + 1, intd)
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
+        self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
 
-######################## FE시 추가해야함
+######## FE시 추가해야함
         self.embedding_dict = {}
         self.embedding_dict['testId'] = self.embedding_test
         self.embedding_dict['assessmentItemID'] = self.embedding_question
         self.embedding_dict['KnowledgeTag'] = self.embedding_tag
         self.embedding_dict['interaction'] = self.embedding_interaction
+        self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
 
-        # Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
+########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
         if self.use_graph:
             self.comb_proj = nn.Sequential(
-                nn.Linear(intd * 4 + self.graph_emb_dim , hd),
+                nn.Linear(intd * len(self.embedding_dict) + self.graph_emb_dim , hd),
                 nn.LayerNorm(hd, eps=1e-6)
             )     
         else:
             self.comb_proj = nn.Sequential(
-                nn.Linear(intd * 4 , hd),
+                nn.Linear(intd * len(self.embedding_dict) , hd),
                 nn.LayerNorm(hd, eps=1e-6)
             )
 
-        # Fully connected layer
+######### Fully connected layer
         if self.residual_connection:
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
@@ -111,7 +122,7 @@ class ModelBase(nn.Module):
                 embed_list.append(self.embedding_dict[feature](feature_seq.long()))
 
         if (self.use_graph== True) & ('assessmentItemID' in input_dic): 
-            embed_list.append(self.graph_emb.item_emb(input_dic['assessmentItemID'].long()))
+            embed_list.append(self.graph_emb.item_emb(input_dic['category']['assessmentItemID'].long()))
 
         embed = torch.cat(embed_list, dim = 2)
         return embed, batch_size
@@ -119,6 +130,14 @@ class ModelBase(nn.Module):
     def get_graph_emb(self, seq):
         return self.graph_emb.item_emb(seq.long())
     
+    def pad(self, seq):
+        seq_len = seq.size(1)
+        tmp = torch.zeros((seq.size(0), self.max_seq_len), dtype=torch.int16)
+        tmp[:, self.max_seq_len-seq_len:] = seq
+        tmp = tmp.to(self.args.device)
+        return tmp.long()
+        
+
     def dic_forward(self, input_dic):
 
 #######Category
@@ -137,9 +156,35 @@ class ModelBase(nn.Module):
         X = self.comb_proj(embed)
 
 #######Continous
+        #input_cont = input_dic['continous']
 
         return X, batch_size
-    
+
+    def short_forward(self, input_dic, length):
+
+#######Category
+        input_cat = input_dic['category']
+        embed_list = []
+        for feature, feature_seq in input_cat.items():
+            batch_size = feature_seq.size(0)
+            
+            if feature not in ('answerCode','mask'):
+                short_feature_seq = feature_seq[:, -length:].long()
+                short_feature_seq = self.pad(short_feature_seq)
+                embed_list.append(self.embedding_dict[feature](short_feature_seq))
+
+        if self.use_graph: 
+            short_feature_seq = input_cat['assessmentItemID'][:, -length:].long()
+            short_feature_seq = self.pad(short_feature_seq)
+            embed_list.append(self.graph_emb.item_emb(short_feature_seq))
+
+        embed = torch.cat(embed_list, dim = 2)
+        X = self.comb_proj(embed)
+
+#######Continous
+
+        return X, batch_size
+
 ######################## FE시 추가해야함
     def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
         batch_size = interaction.size(0)
@@ -245,7 +290,7 @@ class LSTMATTN(ModelBase):
         #                               mask=mask,
         #                              interaction=interaction)
         X, batch_size = super().dic_forward(input_dic)
-        mask = input_dic['mask']
+        mask = input_dic['category']['mask']
 
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
@@ -259,7 +304,7 @@ class LSTMATTN(ModelBase):
         sequence_output = encoded_layers[-1]
 
         if self.residual_connection:
-            graph_out = super().get_graph_emb(input_dic['assessmentItemID'])
+            graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             sequence_output = torch.cat([sequence_output, graph_out], dim = 2)
             sequence_output = sequence_output.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
         else:
@@ -312,13 +357,13 @@ class BERT(ModelBase):
         #                                interaction=interaction)
 
         X, batch_size = super().dic_forward(input_dic)
-        mask = input_dic['mask']
+        mask = input_dic['category']['mask']
 
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
         out = encoded_layers[0]
 
         if self.residual_connection:
-            graph_out = super().get_graph_emb(input_dic['assessmentItemID'])
+            graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
         
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
@@ -624,7 +669,7 @@ class Saint(ModelBase):
         embed_enc, batch_size = super().dic_forward(enc_input)
         embed_dec, batch_size = super().dic_forward(input_dic)
         
-        seq_len = input_dic['interaction'].size(1)
+        seq_len = input_dic['category']['interaction'].size(1)
         
         # ATTENTION MASK 생성
         # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
@@ -654,7 +699,7 @@ class Saint(ModelBase):
         out = out.permute(1, 0, 2)
 
         if self.residual_connection:
-            graph_out = super().get_graph_emb(input_dic['assessmentItemID'])
+            graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
         else:
@@ -735,7 +780,7 @@ class LastQuery(ModelBase):
 
     def forward(self,input_dic):
         X, batch_size = super().dic_forward(input_dic)
-        seq_len = input_dic['interaction'].size(1)
+        seq_len = input_dic['category']['interaction'].size(1)
 
         # position = self.get_pos(self.max_seq_len).to(self.device)
         # embed_pos = self.embedding_position(position)
@@ -761,7 +806,7 @@ class LastQuery(ModelBase):
         out, hidden = self.lstm(out, hidden)
         
         if self.residual_connection:
-            graph_out = super().get_graph_emb(input_dic['assessmentItemID'])
+            graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([graph_out, out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
         else:
@@ -834,7 +879,7 @@ class TransLSTM_G(ModelBase):
         self.enc_dec_mask = None
 
         if self.residual_connection:
-            self.fc = nn.Linear(self.hidden_dim*2 + self.graph_dim, 1)
+            self.fc = nn.Linear(self.hidden_dim + self.graph_dim, 1)
         else:
             self.fc = nn.Linear(self.hidden_dim*2, 1)
 
@@ -850,15 +895,15 @@ class TransLSTM_G(ModelBase):
         #                                mask=mask,
         #                                interaction=interaction)
 
-        X, batch_size = super().dic_forward(input_dic)
 
-        mask = input_dic['mask']
+
+        mask = input_dic['category']['mask']
 
         #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
         embed_enc, batch_size = super().dic_forward(input_dic)
         embed_dec, batch_size = super().dic_forward(input_dic)
         
-        seq_len = input_dic['interaction'].size(1)
+        seq_len = input_dic['category']['interaction'].size(1)
         
 
         if self.enc_mask is None or self.enc_mask.size(0) != seq_len:
@@ -883,24 +928,230 @@ class TransLSTM_G(ModelBase):
                                src_mask=self.enc_mask,
                                tgt_mask=self.dec_mask,
                                memory_mask=self.enc_dec_mask)
-        out_trans = out.permute(1, 0, 2)
+        out = out.permute(1, 0, 2)
 
-
-        #encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
-        #out_trans = encoded_layers[0]
-
-        out_lstm , _ = self.lstm(out_trans)
+        out, _ = self.lstm(out)
         #out_lstm , _ = self.lstm(encoded_layers[0])
 
-        out = torch.cat([out_trans, out_lstm], dim = 2)
-
         if self.residual_connection:
-            graph_emb = super().get_graph_emb(input_dic['assessmentItemID'])
+            graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_emb], dim = 2)
-            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2 + self.graph_emb_dim)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
         else:
-            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim)
 
         
         out = self.fc(out).view(batch_size, -1)
+        return out
+
+
+
+
+
+class LongShort(ModelBase):
+    def __init__(
+        self,
+        args,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        drop_out: float = 0.1,
+        max_seq_len: float = 20,
+        **kwargs
+    ):
+        super().__init__(
+            args,
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+
+        self.args = args
+        self.hidden_dim = args.hidden_dim
+        self.n_layers = args.n_layers
+        self.n_heads = args.n_heads
+        self.drop_out = args.drop_out 
+        self.max_seq_len = args.max_seq_len
+        self.short_len = self.args.short_seq_len
+        self.device = self.args.device
+
+        self.n_tests = n_tests
+        self.n_questions = n_questions
+        self.n_tags = n_tags
+
+        self.get_long_short()
+        self.graph_dim = self.short.get_graph_emb_dim()
+        
+
+        self.long_lstm = nn.LSTM(
+            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+        )
+        self.short_lstm = nn.LSTM(
+            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+        )
+
+        self.long_transformer = nn.Transformer(
+            d_model=self.hidden_dim, 
+            nhead=self.n_heads,
+            num_encoder_layers=self.n_layers, 
+            num_decoder_layers=self.n_layers, 
+            dim_feedforward=self.hidden_dim, 
+            dropout=self.drop_out, 
+            activation='relu')
+        
+        self.short_transformer = nn.Transformer(
+            d_model=self.hidden_dim, 
+            nhead=self.n_heads,
+            num_encoder_layers=self.n_layers, 
+            num_decoder_layers=self.n_layers, 
+            dim_feedforward=self.hidden_dim, 
+            dropout=self.drop_out, 
+            activation='relu')
+        
+        self.long_pos_encoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+        self.long_pos_decoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+        self.short_pos_encoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+        self.short_pos_decoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+
+        self.long_enc_mask = None
+        self.long_dec_mask = None
+        self.long_enc_dec_mask = None
+        self.short_enc_mask = None
+        self.short_dec_mask = None
+        self.short_enc_dec_mask = None
+
+        if self.residual_connection:  
+            self.fc_long = nn.Linear(self.hidden_dim + self.graph_dim, self.hidden_dim // 4)
+            self.fc_short = self.fc_long = nn.Linear(self.hidden_dim + self.graph_dim, self.hidden_dim // 4)
+        else:
+            self.fc_long = self.fc_long = nn.Linear(self.hidden_dim, self.hidden_dim // 4)
+            self.fc_short = self.fc_long = nn.Linear(self.hidden_dim, self.hidden_dim // 4)
+
+        self.fc_last = nn.Linear(self.hidden_dim // 4 + self.hidden_dim // 4 ,1)
+
+    def get_long_short(self):
+        self.short = ModelBase(
+            self.args,
+            self.hidden_dim,
+            self.n_layers,
+            self.n_tests,
+            self.n_questions,
+            self.n_tags
+        )
+
+        self.long = ModelBase(
+            self.args,
+            self.hidden_dim,
+            self.n_layers,
+            self.n_tests,
+            self.n_questions,
+            self.n_tags
+        )
+
+        
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
+        return mask
+    
+
+        
+    ######################## FE시 추가해야함
+    def forward(self, input_dic):
+    
+##################################Long################################
+        Long_mask = input_dic['category']['mask']
+
+        #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
+        long_embed_enc, batch_size = self.long.dic_forward(input_dic)
+        long_embed_dec, batch_size = self.long.dic_forward(input_dic)
+        
+        self.max_seq_len = input_dic['category']['interaction'].size(1)
+        
+        if self.long_enc_mask is None or self.long_enc_mask.size(0) != self.max_seq_len:
+            self.long_enc_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        if self.long_dec_mask is None or self.long_dec_mask.size(0) != self.max_seq_len:
+            self.long_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        if self.long_enc_dec_mask is None or self.long_enc_dec_mask.size(0) != self.max_seq_len:
+            self.long_enc_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        long_embed_enc = long_embed_enc.permute(1, 0, 2)
+        long_embed_dec = long_embed_dec.permute(1, 0, 2)
+        
+        # Positional encoding
+
+        long_embed_enc = self.long_pos_encoder(long_embed_enc)
+        long_embed_dec = self.long_pos_decoder(long_embed_dec)
+        
+        long_out = self.long_transformer(long_embed_enc, long_embed_dec,
+                               src_mask=self.long_enc_mask,
+                               tgt_mask=self.long_dec_mask,
+                               memory_mask=self.long_enc_dec_mask)
+        long_out_trans = long_out.permute(1, 0, 2)
+
+        long_out , _ = self.long_lstm(long_out_trans)
+
+        if self.residual_connection:
+            graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
+            long_out = torch.cat([long_out, graph_emb], dim = 2)
+            long_out = long_out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
+        else:
+            long_out = long_out.contiguous().view(batch_size, -1, self.hidden_dim)
+
+        long_out = self.fc_long(long_out)
+
+##################################Short################################
+
+        #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
+        short_embed_enc, batch_size = self.short.short_forward(input_dic, self.short_len)
+        short_embed_dec, batch_size = self.short.short_forward(input_dic, self.short_len)
+
+        if self.short_enc_mask is None or self.short_enc_mask.size(0) != self.max_seq_len:
+            self.short_enc_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        if self.short_dec_mask is None or self.short_dec_mask.size(0) != self.max_seq_len:
+            self.short_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        if self.short_enc_dec_mask is None or self.short_enc_dec_mask.size(0) != self.max_seq_len:
+            self.short_enc_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+
+        short_embed_enc = short_embed_enc.permute(1, 0, 2)
+        short_embed_dec = short_embed_dec.permute(1, 0, 2)
+        
+        # Positional encoding
+
+        short_embed_enc = self.short_pos_encoder(short_embed_enc)
+        short_embed_dec = self.short_pos_decoder(short_embed_dec)
+        
+        short_out = self.short_transformer(short_embed_enc, short_embed_dec,
+                               src_mask=self.short_enc_mask,
+                               tgt_mask=self.short_dec_mask,
+                               memory_mask=self.short_enc_dec_mask)
+        
+        short_out_trans = short_out.permute(1, 0, 2)
+
+        short_out , _ = self.short_lstm(short_out_trans)
+        #out_lstm , _ = self.lstm(encoded_layers[0])
+
+
+        if self.residual_connection:
+            short_seq = input_dic['category']['assessmentItemID'][:, -self.max_seq_len:]
+            padded_seq = self.short.pad(short_seq)
+            graph_emb = self.short.get_graph_emb(padded_seq )
+            short_out = torch.cat([short_out, graph_emb], dim = 2)
+            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
+        else:
+            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim)
+
+        short_out = self.fc_short(short_out)
+
+        out = torch.cat([short_out, long_out], dim = 2)
+        out = self.fc_last(out).view(batch_size, -1)
+
         return out

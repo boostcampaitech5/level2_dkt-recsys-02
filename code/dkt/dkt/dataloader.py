@@ -12,7 +12,7 @@ from sklearn.model_selection import KFold, GroupKFold
 import pdb
 from .featureEngineering import feature_engineering,elo
 import pickle
-
+import json
 
 class Preprocess:
     def __init__(self, args):
@@ -84,7 +84,7 @@ class Preprocess:
 
     def __preprocessing(self, df: pd.DataFrame, is_train: bool = True) -> pd.DataFrame:
 ######### FE 시에 범주형 변수 추가 시 추가 부탁
-        cate_cols = ["assessmentItemID", "testId", "KnowledgeTag"]
+        cate_cols = ["assessmentItemID", "testId", "KnowledgeTag","question_N"]
         feature_maping_info = {}
         print('---------Preprocessing Data---------')
         if not os.path.exists(self.args.asset_dir):
@@ -132,6 +132,14 @@ class Preprocess:
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         # TODO: Fill in if needed
         print('---------Feature Engineering---------')
+        ######## Feature별 unique한 값의 개수를 저장
+        num_feature = {}
+
+        ########Category 
+        df['question_N'] = df['assessmentItemID'].apply(lambda x: x[-3:]) ####13개
+        num_feature['question_N'] =df['question_N'].nunique()
+
+        #########Continous
         # featureEngineering.py를 import 해서 사용
         #df = feature_engineering(df)
         #df = elo(df)
@@ -158,6 +166,9 @@ class Preprocess:
         #  'bigclass_count', #대분류별 문제 푼 횟수
         #  'elo' #유저의 문제풀이능력
 
+        
+        with open('/opt/level2_dkt-recsys-02/code/dkt/models_param/num_feature.json', 'w') as f: 
+            json.dump(num_feature, f)
 
         return df
 
@@ -183,7 +194,7 @@ class Preprocess:
 
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
 #########  FE 시에 추가 부탁
-        columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
+        columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag", "question_N"]
         self.user_list = df['userID'].unique().tolist()
 
         return df
@@ -211,6 +222,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     r["assessmentItemID"].values,
                     r["KnowledgeTag"].values,
                     r["answerCode"].values,
+                    r['question_N'].values,
                     #r[New Feature].values,
                 )
             )
@@ -219,9 +231,10 @@ class DKTDataset(torch.utils.data.Dataset):
         self.user_list = self.data['userID'].unique().tolist()
         self.window = self.args.window
         self.data_augmentation = self.args.data_augmentation
+
         #######Sliding Window 적용해 데이터 증가, FE 시에 feature 추가해야함
         if self.data_augmentation:
-            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list = self._data_augmentation()
+            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.question_N_list = self._data_augmentation()
 
     def __getitem__(self, index: int) -> dict:
 ####################Sliding Window 적용 시
@@ -233,6 +246,7 @@ class DKTDataset(torch.utils.data.Dataset):
             testId = self.testId_list[index]
             KnowledgeTag = self.KnowledgeTag_list[index]
             answerCode = self.answerCode_list[index]
+            question_N = self.question_N_list[index]
             #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
 
@@ -242,6 +256,7 @@ class DKTDataset(torch.utils.data.Dataset):
             "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
             "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
             "answerCode": torch.tensor(answerCode, dtype=torch.int),
+            "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
             #"userID" : torch.tensor(userID, dtype=torch.int),
             #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
             }
@@ -356,6 +371,7 @@ class DKTDataset(torch.utils.data.Dataset):
         testId_list = []
         KnowledgeTag_list = []
         answerCode_list = []
+        question_N_list = []
         #New Feature_list = []
         #userID_list = []
         print('---------Applying Sliding Window---------')
@@ -364,6 +380,7 @@ class DKTDataset(torch.utils.data.Dataset):
             testId = user_seq['testId'].values[::-1]
             KnowledgeTag = user_seq['KnowledgeTag'].values[::-1]
             answerCode = user_seq['answerCode'].values[::-1]
+            question_N = user_seq['question_N'].values[::-1]
             #New Feature = user_seq['New Feature'].values[::-1]
 
             start_idx = 0
@@ -374,12 +391,14 @@ class DKTDataset(torch.utils.data.Dataset):
                     testId_list = self.shuffle(testId_list,  testId[::-1])
                     KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[::-1])
                     answerCode_list = self.shuffle(answerCode_list,  answerCode[::-1])
+                    question_N_list = self.shuffle(question_N_list,  question_N[::-1])
                     #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])
                 else:
                     assessmentItemID_list.append(assessmentItemID[::-1])
                     testId_list.append(testId[::-1])
                     KnowledgeTag_list.append(KnowledgeTag[::-1])
                     answerCode_list.append(answerCode[::-1])
+                    question_N_list.append(question_N[::-1])
                     #New Feature_list.append(New Feature[::-1])
                 #userID_list.append([userID]* len(answerCode[::-1]))
             else:
@@ -393,18 +412,20 @@ class DKTDataset(torch.utils.data.Dataset):
                         testId_list = self.shuffle(testId_list,  testId[start_idx: start_idx + self.max_seq_len][::-1])
                         KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list = self.shuffle(answerCode_list,  answerCode[start_idx: start_idx + self.max_seq_len][::-1])
+                        question_N_list = self.shuffle(question_N_list,  question_N[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list = self.shuffle(New Feature_list,  New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     else:
                         assessmentItemID_list.append(assessmentItemID[start_idx: start_idx + self.max_seq_len][::-1])
                         testId_list.append(testId[start_idx: start_idx + self.max_seq_len][::-1])
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
+                        question_N_list.append(question_N[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                     #userID_list.append([userID]* len(answerCode[::-1]))
                     start_idx += self.window
 
         ######FE시에 추가해야함
-        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list #New Feature_list
+        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, question_N_list #New Feature_list
 
 def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils.data.DataLoader]:
     pin_memory = False
