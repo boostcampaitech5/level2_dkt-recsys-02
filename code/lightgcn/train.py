@@ -45,7 +45,8 @@ def main(args: argparse.Namespace):
         )
     
     try:
-        with open('/opt/ml/input/code/dkt/models_param/feature_mapper.pkl', 'rb') as f: feature_maping_info = pickle.load(f)
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../dkt/models_param/feature_mapper.pkl', 'rb') as f: feature_maping_info = pickle.load(f)
     except:
         print('Run dkt train.py first to get feature mapping info')
         raise Exception
@@ -60,8 +61,8 @@ def main(args: argparse.Namespace):
         else:
             item_emb[feature_maping_info['assessmentItemID'][id]] = graph_emb[index]
 
-
-    with open(f'/opt/ml/input/code/lightgcn/models_param/lgcn_item_emb_{args.hidden_dim}.pkl', 'wb') as f: pickle.dump(item_emb, f)
+    curr_dir = __file__[:__file__.rfind('/')+1]
+    with open(curr_dir + f'models_param/lgcn_item_emb_{args.hidden_dim}.pkl', 'wb') as f: pickle.dump(item_emb, f)
     #with open('/opt/ml/input/code/lightgcn/models_param/lgcn_user_emb.pkl', 'wb') as f: pickle.dump(user_emb, f)
 
 if __name__ == "__main__":
