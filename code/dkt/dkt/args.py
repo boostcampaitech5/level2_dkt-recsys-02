@@ -53,7 +53,16 @@ def parse_args():
         "--graph_model", default="lgcn", type=str,  help="Which model to use"
     )
     parser.add_argument(
+        "--graph_dim", default=64, type=int,  help="Graph dim"
+    )
+    parser.add_argument(
+        "--use_res", default=False, type=bool,  help="Use Residual Connection"
+    )
+    parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"
+    )
+    parser.add_argument(
+        "--n_folds", default=5, type=int, help="Num of Kfold"
     )
     parser.add_argument(
         "--past_present", default=False, type=bool, help="use past and present at the same time"
@@ -64,9 +73,13 @@ def parse_args():
     parser.add_argument(
         "--hidden_dim", default=64, type=int, help="hidden dimension size"
     )
+    parser.add_argument(
+        "--resize_factor", default=3, type=int, help="determine intd"
+    )
     parser.add_argument("--n_layers", default=2, type=int, help="number of layers")
     parser.add_argument("--n_heads", default=2, type=int, help="number of heads")
     parser.add_argument("--drop_out", default=0.2, type=float, help="drop out rate")
+    parser.add_argument("--short_seq_len", default=5, type=int, help="drop out rate")
 
     # 훈련
     parser.add_argument("--n_epochs", default=20, type=int, help="number of epochs")

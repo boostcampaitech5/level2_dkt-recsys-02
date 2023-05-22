@@ -49,3 +49,66 @@ lastquery:
     drop_out:
       min: 0.0
       max: 0.5
+
+translstm_g:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [16, 32, 64, 128, 256, 512, 1024]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    graph_dim:
+      values: [64, 128, 256]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    resize_factor:
+      values: [2,3,4,5]
+    max_seq_len:
+      min: 5
+      max: 200
+    hidden_dim:
+      values: [16, 32, 64, 128, 256, 512, 1024]
+    shuffle_n:
+      values: [1, 2, 3]
+    window: #seq_len에 adaptive하게 조정이 필요 seq len = 10 , window = 30 -> 에러는 안나나 건너뛰는 데이터 너무 많아짐
+      min: 1
+      max: 50
+    use_res:
+      values: [True, False]
+
+
+lstmattn:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [16, 32, 64, 128, 256, 512, 1024]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    max_seq_len:
+      min: 5
+      max: 200
+    hidden_dim:
+      min: 16
+      max: 1024
+    shuffle_n:
+      values: [1, 2, 3, 4, 5]
+    #window: seq_len에 adaptive하게 조정이 필요 seq len = 10 , window = 30 -> 에러는 안나나 건너뛰는 데이터 너무 많아짐
+      #values: [1, 2, 3, 4, 5]
+    use_res:
+      values: [True, False]

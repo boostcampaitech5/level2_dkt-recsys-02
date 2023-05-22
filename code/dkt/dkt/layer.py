@@ -2,7 +2,22 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import re
 
+class Feed_Forward_block(nn.Module):
+    """
+    out =  Relu( M_out*w1 + b1) *w2 + b2
+    """
+
+    def __init__(self, dim_ff):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+        self.layer2 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+
+    def forward(self, ffn_in):
+        return self.layer2(F.relu(self.layer1(ffn_in)))
+    
+    
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, hidden_units, dropout_rate):
         super(ScaledDotProductAttention, self).__init__()
@@ -135,21 +150,6 @@ class DecoderMultiHeadAttention(nn.Module):
         output = self.layerNorm(self.dropout(self.W_O(output)) + residual) # (batch_size, max_len, hidden_units)
         return output, attn_dist
 
-class DecoderBlock(nn.Module):
-    def __init__(self, num_heads, hidden_units, dropout_rate):
-        super(DecoderBlock, self).__init__()
-        self.decoder_attention = DecoderMultiHeadAttention(num_heads, hidden_units, dropout_rate)
-        self.pointwise_feedforward = PositionwiseFeedForward(hidden_units, dropout_rate)
-
-    def forward(self, input_enc, input_dec, mask):
-        """
-        input_enc : (batch_size, max_len, hidden_units)
-        mask : (batch_size, 1, max_len, max_len)
-        """
-        output_dec, attn_dist = self.decoder_attention(input_enc, input_dec, mask)
-        output_dec = self.pointwise_feedforward(output_dec)
-        return output_dec, attn_dist
-
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=1000):
         super(PositionalEncoding, self).__init__()
@@ -168,3 +168,8 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         x = x + self.scale * self.pe[:x.size(0), :]
         return self.dropout(x)
+    
+
+
+
+

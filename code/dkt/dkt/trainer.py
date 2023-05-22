@@ -6,16 +6,17 @@ import torch
 from torch import nn
 from torch.nn.functional import sigmoid
 import wandb
-
+from dkt import trainer
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, BERT, Saint
+from .model import LSTM, LSTMATTN, BERT, Saint, LastQuery, TransLSTM_G,LongShort
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
 import pdb
 import yaml
+import gc
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -44,9 +45,10 @@ def run(args,
         logger.info("Start Training: Epoch %s", epoch + 1)
 
         # TRAIN
+ 
         train_auc, train_acc, train_loss = train(train_loader=train_loader,
-                                                 model=model, optimizer=optimizer,
-                                                 scheduler=scheduler, args=args)
+                                                    model=model, optimizer=optimizer,
+                                                    scheduler=scheduler, args=args)
 
         # VALID
         auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
@@ -97,17 +99,97 @@ def run(args,
             'val_acc': val_acc_avg,
         })
         
-        with open('./sweep_best_auc.yaml') as file:
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../sweep_best_auc.yaml') as file:
             output = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
             
         if output[args.model.lower()]['best_auc'] < val_auc_avg:
             output[args.model.lower()]['best_auc'] = float(val_auc_avg)
-            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(float, dict(wandb.config).values())))
+            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             
-        with open('./sweep_best_auc.yaml', 'w') as file:
+        with open(curr_dir + '../sweep_best_auc.yaml', 'w') as file:
             yaml.dump(output, file, default_flow_style=False)
         file.close()
+
+
+def run_kfold(args,
+        kfolds: list):
+    
+
+    fold_weights = []
+
+    for k, fold_dict in enumerate(kfolds):
+        model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+        logger.info("Start Training: Fold %s", k + 1)
+        train_data = fold_dict['train']
+        valid_data = fold_dict['val']
+        train_loader, valid_loader = get_loaders(args=args, train=train_data, valid=valid_data)
+
+        # For warmup scheduler which uses step interval
+        args.total_steps = int(math.ceil(len(train_loader.dataset) / args.batch_size)) * (
+            args.n_epochs
+        )
+        args.warmup_steps = args.total_steps // 10
+
+        optimizer = get_optimizer(model=model, args=args)
+        scheduler = get_scheduler(optimizer=optimizer, args=args)
+
+        best_auc = -1
+        early_stopping_counter = 0
+        for epoch in range(args.n_epochs):
+            logger.info("Start Training: Epoch %s", epoch + 1)
+
+            # TRAIN
+            train_auc, train_acc, train_loss = train(train_loader=train_loader,
+                                                    model=model, optimizer=optimizer,
+                                                    scheduler=scheduler, args=args)
+
+            # VALID
+            auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
+
+            wandb.log(dict(epoch=epoch,
+                        train_loss_epoch=train_loss,
+                        train_auc_epoch=train_auc,
+                        train_acc_epoch=train_acc,
+                        valid_auc_epoch=auc,
+                        valid_acc_epoch=acc))
+            
+            if auc > best_auc:
+                best_auc = auc
+                # nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
+                model_to_save = model.module if hasattr(model, "module") else model
+                #save_checkpoint(state={"epoch": epoch + 1,
+                #                    "state_dict": model_to_save.state_dict()},
+                #                model_dir=args.model_dir,
+                #                #########모델 이름_best_model.pt로 저장하기
+                #                model_filename=f"{args.model.lower()}_best_model_fold{k+1}.pt")
+                early_stopping_counter = 0
+                fold_weights.append(model.state_dict())
+            else:
+                early_stopping_counter += 1
+                if early_stopping_counter >= args.patience:
+                    logger.info(
+                        "EarlyStopping counter: %s out of %s",
+                        early_stopping_counter, args.patience
+                    )
+                    break
+
+            # scheduler
+            if args.scheduler == "plateau":
+                scheduler.step(best_auc)
+
+    average_weights = {}
+    for key in fold_weights[0].keys():
+        average_weights[key] = torch.stack([fold[key].float() for fold in fold_weights], dim=0).mean(dim=0)
+    for key in average_weights: average_weights[key].to(dtype = torch.int64)
+
+    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+    model.load_state_dict(average_weights)
+
+    save_checkpoint(state={"state_dict": model_to_save.state_dict()},
+                            model_dir=args.model_dir,
+                            model_filename=f"{args.model.lower()}_best_model_kfold.pt")
 
 
 def train(train_loader: torch.utils.data.DataLoader,
@@ -121,10 +203,12 @@ def train(train_loader: torch.utils.data.DataLoader,
     total_targets = []
     losses = []
     for step, batch in enumerate(train_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
+        for key in batch:
+            tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+            batch[key] = tmp
+
         preds = model(batch)
-        targets = batch["answerCode"]
+        targets = batch['category']["answerCode"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
@@ -148,8 +232,12 @@ def train(train_loader: torch.utils.data.DataLoader,
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
     loss_avg = sum(losses) / len(losses)
     logger.info("TRAIN AUC : %.4f ACC : %.4f", auc, acc)
-    return auc, acc, loss_avg
 
+    del batch, total_preds, total_targets, preds, losses
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    return auc, acc, loss_avg
 
 def validate(valid_loader: nn.Module, model: nn.Module, args):
     model.eval()
@@ -157,20 +245,25 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in enumerate(valid_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
-        preds = model(batch)
-        targets = batch["answerCode"]
+    with torch.no_grad():
+        for step, batch in enumerate(valid_loader):
 
-        loss = compute_loss(preds=preds, targets=targets)
-        # predictions
-        preds = sigmoid(preds[:, -1])
-        targets = targets[:, -1]
+            for key in batch:
+                tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+                batch[key] = tmp
+        
+            #preds = model(**batch)
+            preds = model(batch)
+            targets = batch['category']["answerCode"]
 
-        total_preds.append(preds.detach())
-        total_targets.append(targets.detach())
-        losses.append(loss)
+            loss = compute_loss(preds=preds, targets=targets)
+            # predictions
+            preds = sigmoid(preds[:, -1])
+            targets = targets[:, -1]
+
+            total_preds.append(preds.detach())
+            total_targets.append(targets.detach())
+            losses.append(loss)
 
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()
@@ -179,7 +272,13 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     auc, acc = get_metric(targets=total_targets, preds=total_preds)
     loss_avg = sum(losses) / len(losses)
     logger.info("VALID AUC : %.4f ACC : %.4f", auc, acc)
+
+    del batch, total_preds, total_targets, preds, losses
+    gc.collect()
+    torch.cuda.empty_cache()
+
     return auc, acc, loss_avg
+
 
 
 def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
@@ -188,7 +287,11 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
 
     total_preds = []
     for step, batch in enumerate(test_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
+         
+        for key in batch:
+            tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+            batch[key] = tmp
+        
         #preds = model(**batch)
         preds = model(batch)
         # predictions
@@ -201,6 +304,9 @@ def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
     with open(write_path, "w", encoding="utf8") as w:
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
+            ### thresholding
+            #if p > 0.5: p = 1
+            #else: p = 0
             w.write("{},{}\n".format(id, p))
     logger.info("Successfully saved submission as %s", write_path)
 
@@ -221,6 +327,9 @@ def get_model(args) -> nn.Module:
             "lstmattn": LSTMATTN,
             "bert": BERT,
             'saint':Saint,
+            'lastquery':LastQuery,
+            'translstm_g' :TransLSTM_G,
+            'longshort':LongShort
         }.get(model_name)(**model_args)
   
     except KeyError:
@@ -252,7 +361,9 @@ def update_params(loss: torch.Tensor,
                   optimizer: torch.optim.Optimizer,
                   scheduler: torch.optim.lr_scheduler._LRScheduler,
                   args):
-    loss.backward()
+    if args.model.lower() == 'longshort': loss.backward(retain_graph=True)
+    else: loss.backward()
+    
     nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
     if args.scheduler == "linear_warmup":
         scheduler.step()

@@ -28,3 +28,6 @@ lstmattn:
 saint:
   best_auc: -1
   parameter: null
+translstm_g:
+  best_auc: -1
+  parameter: null
