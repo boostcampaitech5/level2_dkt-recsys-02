@@ -12,6 +12,7 @@ from sklearn.model_selection import KFold, GroupKFold
 import pdb
 from .featureEngineering import feature_engineering,elo
 import pickle
+import json
 
 
 class Preprocess:
@@ -125,17 +126,27 @@ class Preprocess:
 
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
         
-        current_dir = os.getcwd()  
-        with open('/opt/level2_dkt-recsys-02/code/dkt/models_paramfeature_mapper.pkl', 'wb') as f: 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../models_paramfeature_mapper.pkl', 'wb') as f: 
             pickle.dump(feature_maping_info, f)
         return df
 
     def __feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         # TODO: Fill in if needed
         print('---------Feature Engineering---------')
+        ######## Feature별 unique한 값의 개수를 저장
+        num_feature = {}
+
+        ########Category 
+        df['question_N'] = df['assessmentItemID'].apply(lambda x: x[-3:]) ####13개
+        num_feature['question_N'] =df['question_N'].nunique()
+
+        #########Continous
         # featureEngineering.py를 import 해서 사용
         df = feature_engineering(df)
         df = elo(df)
+        num_feature['dayname'] = df['dayname'].nunique()
+        num_feature['bigclass'] = df['bigclass']nunique()
         # 범주형 변수 : [KnowledgeTag,dayname, bigclass]
         # 추가된 피쳐
         # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
@@ -159,6 +170,10 @@ class Preprocess:
         #  'bigclass_count', #대분류별 문제 푼 횟수
         #  'elo' #유저의 문제풀이능력
 
+
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../models_param/num_feature.json', 'w') as f: 
+            json.dump(num_feature, f)
 
         return df
 
@@ -195,13 +210,14 @@ class Preprocess:
                     "test_mean", "test_sum", "tag_mean", "tag_sum",
                     "elapsed", "elapsed_cumsum", "month", "day", "hour", "dayname",
                     "elapsed_med", "bigclass", "bigclasstime", "bigclass_acc",
-                    "bigclass_sum", "bigclass_count", "elo"
+                    "bigclass_sum", "bigclass_count", "elo","question_N"
                 ]
         self.userID = df['userID'].unique().tolist()
         self.assessmentItemID = df['assessmentItemID'].unique().tolist()
         self.testId = df['testId'].unique().tolist()
         self.answerCode = df['answerCode'].unique().tolist()
         self.KnowledgeTag = df['KnowledgeTag'].unique().tolist()
+        self.question_N = df['qunestion_N'].unique().tolist()
         self.user_correct_answer = df['user_correct_answer'].unique().tolist()
         self.user_total_answer = df['user_total_answer'].unique().tolist()
         self.user_acc = df['user_acc'].unique().tolist()
@@ -248,6 +264,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     r["assessmentItemID"].values,
                     r["KnowledgeTag"].values,
                     r["answerCode"].values,
+                    r['question_N'].values,
                     # r[New Feature].values,
                     r['user_correct_answer'].values, 
                     r['user_total_answer'].values, 
@@ -278,7 +295,7 @@ class DKTDataset(torch.utils.data.Dataset):
         self.data_augmentation = self.args.data_augmentation
         #######Sliding Window 적용해 데이터 증가, FE 시에 feature 추가해야함
         if self.data_augmentation:
-            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.user_correct_answer_list, self.user_total_answer_list,
+            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.question_N_list, self.user_correct_answer_list, self.user_total_answer_list, 
             self.user_acc_list, self.test_mean_list , self.test_mean_list , self.test_sum_list, self.tag_mean_list, self.tag_sum_list, self.elapsed_list,
             self.elapsed_cumsum_list, self.month_list, self.hour_list, self.day_list, self.dayname_list, self.elapsed_med_list, self.bigclass_list,self.bigclasstime_list,
             self.bigclass_acc_list, self.bigclass_count_list, self.elo_list = self._data_augmentation()
@@ -295,6 +312,7 @@ class DKTDataset(torch.utils.data.Dataset):
             answerCode = self.answerCode_list[index]
             #userID = self.userID_list[index]
             #New Feature = self.New_Feature_list[index]
+            question_N = self.question_N_list[index]
             user_correct_answer = self.user_correct_answer_list[index]
             user_total_answer = self.user_total_answer_list[index]
             user_acc = self.user_acc_list[index]
@@ -324,6 +342,7 @@ class DKTDataset(torch.utils.data.Dataset):
             "answerCode": torch.tensor(answerCode, dtype=torch.int),
             #"userID" : torch.tensor(userID, dtype=torch.int),
             #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+            "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
             "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
             "bigclass" : torch.tensor(bigclass + 1, dtype = torch.int)
             }
@@ -369,10 +388,10 @@ class DKTDataset(torch.utils.data.Dataset):
         else:
             row = self.grouped_value[index]
 ####################FE 추가 시 추가해야함
-            assessmentItemID, testId, KnowledgeTag, answerCode, user_correct_answer, user_total_answer,
+            assessmentItemID, testId, KnowledgeTag, answerCode, question_N, user_correct_answer, user_total_answer,
             user_acc, test_mean, test_mean, test_sum, tag_mean, tag_sum, elapsed,
             elapsed_cumsum, month, hour, day, dayname, elapsed_med, bigclass, bigclasstime,
-            bigclass_acc, bigclass_count, elo = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13], row[14], row[15], row[16], row[17], row[18],        row[19], row[20], row[21], row[22], row[23] 
+            bigclass_acc, bigclass_count, elo = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13], row[14], row[15], row[16], row[17], row[18],        row[19], row[20], row[21], row[22], row[23] ,row[24]
             
             cat_data = {
             "testId": torch.tensor(testId + 1, dtype=torch.int),
@@ -381,6 +400,7 @@ class DKTDataset(torch.utils.data.Dataset):
             "answerCode": torch.tensor(answerCode, dtype=torch.int),
             #"userID" : torch.tensor(userID, dtype=torch.int),
             #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
+            "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
             "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
             "bigclass" : torch.tensor(bigclass + 1, dtype = torch.int)
             }
@@ -483,6 +503,7 @@ class DKTDataset(torch.utils.data.Dataset):
         answerCode_list = []
         #New Feature_list = []
         #userID_list = []
+        question_N_list = []
         user_correct_answer_list = []
         user_total_answer_list = []
         user_acc_list = []
@@ -510,6 +531,7 @@ class DKTDataset(torch.utils.data.Dataset):
             KnowledgeTag = user_seq['KnowledgeTag'].values[::-1]
             answerCode = user_seq['answerCode'].values[::-1]
             #New Feature = user_seq['New Feature'].values[::-1]
+            question_N = user_seq['question_N'].values[::-1]
             user_correct_answer = user_seq['user_correct_answer'].values[::-1]
             user_total_answer = user_seq['user_total_answer'].values[::-1]
             user_acc = user_seq['user_acc'].values[::-1]
@@ -540,6 +562,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[::-1])
                     answerCode_list = self.shuffle(answerCode_list,  answerCode[::-1])
                     #New Feature_list = self.shuffle(New Feature_list,  New Feature[::-1])      
+                    question_N_list = self.shuffle(question_N_list, question_N[::-1])
                     user_correct_answer_list = self.shuffle(user_correct_answer_list, user_correct_answer[::-1])
                     user_total_answer_list = self.shuffle(user_total_answer_list, user_total_answer[::-1])
                     user_acc_list = self.shuffle(user_acc_list, user_acc[::-1])
@@ -566,6 +589,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     KnowledgeTag_list.append(KnowledgeTag[::-1])
                     answerCode_list.append(answerCode[::-1])
                     #New Feature_list.append(New Feature[::-1])
+                    question_N_list.append(question_N[::-1])
                     userID_list.append([userID]* len(answerCode[::-1
                     user_correct_answer_list.append(user_correct_answer[::-1])
                     user_total_answer_list.append(user_total_answer[::-1])
@@ -599,6 +623,7 @@ class DKTDataset(torch.utils.data.Dataset):
                         KnowledgeTag_list = self.shuffle(KnowledgeTag_list,  KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list = self.shuffle(answerCode_list,  answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list = self.shuffle(New Feature_list,  New Feature[start_idx: start_idx + self.max_seq_len][::-1])
+                        question_N_list = self.shuffle(question_N_list, question_N[start_idx: start_idx + self.max_seq_len][::-1])
                         user_correct_answer_list = self.shuffle(user_correct_answer_list, user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1])
                         user_total_answer_list = self.shuffle(user_total_answer_list, user_total_answer[start_idx: start_idx + self.max_seq_len][::-1])
                         user_acc_list = self.shuffle(user_acc_list, user_acc[start_idx: start_idx + self.max_seq_len][::-1])
@@ -625,7 +650,8 @@ class DKTDataset(torch.utils.data.Dataset):
                         KnowledgeTag_list.append(KnowledgeTag[start_idx: start_idx + self.max_seq_len][::-1])
                         answerCode_list.append(answerCode[start_idx: start_idx + self.max_seq_len][::-1])
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
-                        userID_list.append([userID]* len(answerCode[::-1]))
+                        # userID_list.append([userID]* len(answerCode[::-1]))
+                        question_N_list.append(question_N[start_idx: start_idx + self.max_seq_len][::-1])                                        
                         user_correct_answer_list = user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1]
                         user_total_answer_list = user_total_answer[start_idx: start_idx + self.max_seq_len][::-1]
                         user_acc_list = user_acc[start_idx: start_idx + self.max_seq_len][::-1]
@@ -649,7 +675,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     start_idx += self.window
 
         ######FE시에 추가해야함
-        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, user_correct_answer_list, user_total_answer_list,
+        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, question_N_list, user_correct_answer_list, user_total_answer_list,
                 user_acc_list, test_mean_list, test_mean_list, test_sum_list, tag_mean_list, tag_sum_list, elapsed_list,
                 elapsed_cumsum_list, month_list, hour_list, day_list, dayname_list, elapsed_med_list, bigclass_list, bigclasstime_list,
                 bigclass_acc_list, bigclass_count_list, elo_list
