@@ -125,7 +125,7 @@ class Preprocess:
         df["Timestamp"] = df["Timestamp"].apply(convert_time)
         
         current_dir = os.getcwd()  
-        with open('/opt/level2_dkt-recsys-02/code/dkt/models_paramfeature_mapper.pkl', 'wb') as f: 
+        with open('/opt/level2_dkt-recsys-02/code/dkt/models_param/feature_mapper.pkl', 'wb') as f: 
             pickle.dump(feature_maping_info, f)
         return df
 
@@ -283,13 +283,14 @@ class DKTDataset(torch.utils.data.Dataset):
         else:
             row = self.grouped_value[index]
 ####################FE 추가 시 추가해야함
-            testId, assessmentItemID, KnowledgeTag, answerCode = row[0], row[1], row[2], row[3], ## row[4]....
+            testId, assessmentItemID, KnowledgeTag, answerCode,question_N = row[0], row[1], row[2], row[3], row[4] ## row[4]....
             
             cat_data = {
                 "testId": torch.tensor(testId + 1, dtype=torch.int),
                 "assessmentItemID": torch.tensor(assessmentItemID + 1, dtype=torch.int),
                 "KnowledgeTag": torch.tensor(KnowledgeTag + 1, dtype=torch.int),
                 "answerCode": torch.tensor(answerCode, dtype=torch.int),
+                "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
                 #"userID" : torch.tensor(userID, dtype=torch.int),
                 #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
                 }
