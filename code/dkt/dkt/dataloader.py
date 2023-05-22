@@ -167,7 +167,8 @@ class Preprocess:
         #  'elo' #유저의 문제풀이능력
 
         
-        with open('/opt/level2_dkt-recsys-02/code/dkt/models_param/num_feature.json', 'w') as f: 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../models_param/num_feature.json', 'w') as f: 
             json.dump(num_feature, f)
 
         return df

@@ -59,7 +59,8 @@ class ModelBase(nn.Module):
         self.n_tags = n_tags
         self.resize_factor = self.args.resize_factor
 
-        with open(f'/opt/level2_dkt-recsys-02/code/dkt/models_param/num_feature.json', 'r') as f:
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
 
 ########Graph Embedding\
