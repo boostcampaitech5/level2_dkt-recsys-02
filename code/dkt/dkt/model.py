@@ -45,6 +45,9 @@ class ModelBase(nn.Module):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
+
         **kwargs
     ):
 
@@ -57,6 +60,8 @@ class ModelBase(nn.Module):
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
+        self.n_dayname = n_dayname
+        self.n_bigclass = n_bigclass
         self.resize_factor = self.args.resize_factor
 
         curr_dir = __file__[:__file__.rfind('/')+1]
@@ -79,6 +84,9 @@ class ModelBase(nn.Module):
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
         self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
+        self.embedding_dayname = nn.Embedding(n_dayname + 1, intd)
+        self.embedding_bigclass = nn.Embedding(n_bigclass + 1, intd)
+        
 
 ######## FE시 추가해야함
         self.embedding_dict = {}
@@ -88,6 +96,8 @@ class ModelBase(nn.Module):
         self.embedding_dict['interaction'] = self.embedding_interaction
         self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
+        self.embedding_dict['dayname'] = self.embedding_dayname
+        self.embedding_dict['bigclass'] = self.embedding_bigclass
 
 ########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
         if self.use_graph:
@@ -189,19 +199,23 @@ class ModelBase(nn.Module):
         return X, batch_size
 
 ######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction, dayname, bigclass):
         batch_size = interaction.size(0)
         # Embedding
         embed_interaction = self.embedding_interaction(interaction.long())
         embed_test = self.embedding_test(testId.long())
         embed_question = self.embedding_question(assessmentItemID.long())
         embed_tag = self.embedding_tag(KnowledgeTag.long())
+        embed_dayname = self.embedding_dayname(dayname.long())
+        embed_bigclass = self.embedding_bigclass(bigcalass.long())
         embed = torch.cat(
             [
                 embed_interaction,
                 embed_test,
                 embed_question,
                 embed_tag,
+                embed_dayname,
+                embed_bigclass,
             ],
             dim=2,
         )
@@ -218,6 +232,8 @@ class LSTM(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
         **kwargs
     ):
         super().__init__(
@@ -226,7 +242,9 @@ class LSTM(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            n_tags,
+            n_dayname,
+            n_bigclass
         )
         self.args = args
 
@@ -240,7 +258,12 @@ class LSTM(ModelBase):
         #                                KnowledgeTag=KnowledgeTag,
         #                                answerCode=answerCode,
         #                                mask=mask,
-        #                                interaction=interaction)
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
+        
+        
+   
         X, batch_size = super().dic_forward(input_dic)
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
@@ -257,6 +280,8 @@ class LSTMATTN(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
         n_heads: int = 2,
         drop_out: float = 0.1,
         **kwargs
@@ -267,7 +292,9 @@ class LSTMATTN(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            n_tags,
+            n_dayname,
+            n_bigclass
         )
         self.n_heads = n_heads
         self.drop_out = drop_out
@@ -288,10 +315,12 @@ class LSTMATTN(ModelBase):
     def forward(self, input_dic):
         #X, batch_size = super().forward(testId=testId,
         #                                assessmentItemID=assessmentItemID,
-        #                               KnowledgeTag=KnowledgeTag,
-        #                              answerCode=answerCode,
-        #                               mask=mask,
-        #                              interaction=interaction)
+        #                                KnowledgeTag=KnowledgeTag,
+        #                                answerCode=answerCode,
+        #                                mask=mask,
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
 
@@ -326,6 +355,8 @@ class BERT(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
         n_heads: int = 2,
         drop_out: float = 0.1,
         max_seq_len: float = 20,
@@ -337,7 +368,9 @@ class BERT(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            n_tags,
+            n_dayname,
+            n_bigclass
         )
         self.n_heads = n_heads
         self.drop_out = drop_out
@@ -357,7 +390,9 @@ class BERT(ModelBase):
         #                                KnowledgeTag=KnowledgeTag,
         #                                answerCode=answerCode,
         #                                mask=mask,
-        #                                interaction=interaction)
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
 
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
