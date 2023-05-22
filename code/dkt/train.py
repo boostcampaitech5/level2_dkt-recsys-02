@@ -84,7 +84,8 @@ if __name__ == "__main__":
     args = parse_args()
     os.makedirs(args.model_dir, exist_ok=True)
     if args.sweep_run:
-        with open('/opt/level2_dkt-recsys-02/code/dkt/sweep_config.yaml') as file:
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + 'sweep_config.yaml') as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
 
