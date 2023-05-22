@@ -84,14 +84,11 @@ def run(
             'val_acc': val_acc_avg,
         })
         
-        try:
-            with open('./sweep_best_auc.yaml') as file:
-                output = yaml.load(file, Loader=yaml.FullLoader)
-            file.close()
-        except:
-            with open('/opt/level2_dkt-recsys-02/code/lgcn/sweep_best_auc.yaml') as file:
-                output = yaml.load(file, Loader=yaml.FullLoader)
-            file.close()
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../sweep_best_auc.yaml') as file:
+            output = yaml.load(file, Loader=yaml.FullLoader)
+        file.close()
+
         if output[args.model.lower()]['best_auc'] < val_auc_avg:
             output[args.model.lower()]['best_auc'] = float(val_auc_avg)
             output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(float, dict(wandb.config).values())))
