@@ -17,6 +17,7 @@ from .utils import get_logger, logging_conf
 import pdb
 import yaml
 import gc
+import math
 
 logger = get_logger(logger_conf=logging_conf)
 
@@ -25,6 +26,14 @@ def run(args,
         train_data: np.ndarray,
         valid_data: np.ndarray,
         model: nn.Module):
+    
+
+    #gpus = [torch.cuda.device(i) for i in range(torch.cuda.device_count())]
+
+    #if gpus:
+    #    for gpu in gpus:
+    #        torch.cuda.set_per_process_memory_fraction(0.9, gpu)  # Set the desired memory fraction
+
     train_loader, valid_loader = get_loaders(args=args, train=train_data, valid=valid_data)
 
     # For warmup scheduler which uses step interval
@@ -228,6 +237,10 @@ def train(train_loader: torch.utils.data.DataLoader,
         total_targets.append(targets.detach())
         losses.append(loss)
 
+        del batch, tmp
+        gc.collect()
+        torch.cuda.empty_cache()
+        
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()
 
@@ -236,7 +249,7 @@ def train(train_loader: torch.utils.data.DataLoader,
     loss_avg = sum(losses) / len(losses)
     logger.info("TRAIN AUC : %.4f ACC : %.4f", auc, acc)
 
-    del batch, total_preds, total_targets, preds, losses
+    del total_preds, total_targets, preds, losses
     gc.collect()
     torch.cuda.empty_cache()
 
@@ -268,6 +281,10 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
             total_targets.append(targets.detach())
             losses.append(loss)
 
+            del batch, tmp
+            gc.collect()
+            torch.cuda.empty_cache()
+
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()
 
@@ -276,7 +293,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     loss_avg = sum(losses) / len(losses)
     logger.info("VALID AUC : %.4f ACC : %.4f", auc, acc)
 
-    del batch, total_preds, total_targets, preds, losses
+    del total_preds, total_targets, preds, losses
     gc.collect()
     torch.cuda.empty_cache()
 
