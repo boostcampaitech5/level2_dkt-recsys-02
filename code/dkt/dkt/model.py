@@ -14,7 +14,8 @@ import json
 class GraphEmbedding:
     def __init__(self, args, model):
         self.args = args
-        with open(f'/opt/ml/input/code/lightgcn/models_param/{model}_item_emb_{args.graph_dim}.pkl', 'rb') as f: 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + f'../../lightgcn/models_param/{model}_item_emb_{args.graph_dim}.pkl', 'rb') as f: 
             item_emb_dic = pickle.load(f)
             
             item_emb = []
