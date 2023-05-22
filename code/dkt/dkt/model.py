@@ -50,6 +50,7 @@ class ModelBase(nn.Module):
 
         super().__init__()
         self.args = args
+        self.use_res = self.args.use_res
         self.max_seq_len = self.args.max_seq_len
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
@@ -60,9 +61,6 @@ class ModelBase(nn.Module):
 
         with open(f'/opt/level2_dkt-recsys-02/code/dkt/models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
-
-########Residual Connection
-        self.residual_connection = self.args.use_res
 
 ########Graph Embedding\
         self.use_graph = self.args.use_graph
@@ -109,7 +107,7 @@ class ModelBase(nn.Module):
         #)
 
 ######### Fully connected layer
-        if (self.residual_connection == True) & (self.use_graph == True):
+        if (self.use_res == True) & (self.use_graph == True):
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
             self.fc = nn.Linear(hd, 1)
@@ -307,7 +305,7 @@ class LSTMATTN(ModelBase):
         encoded_layers = self.attn(out, extended_attention_mask, head_mask=head_mask)
         sequence_output = encoded_layers[-1]
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             sequence_output = torch.cat([sequence_output, graph_out], dim = 2)
             sequence_output = sequence_output.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -366,7 +364,7 @@ class BERT(ModelBase):
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
         out = encoded_layers[0]
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
         
@@ -702,7 +700,7 @@ class Saint(ModelBase):
 
         out = out.permute(1, 0, 2)
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -809,7 +807,7 @@ class LastQuery(ModelBase):
         hidden = self.init_hidden(batch_size)
         out, hidden = self.lstm(out, hidden)
         
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([graph_out, out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -1104,8 +1102,7 @@ class LongShort(ModelBase):
         long_out_trans = long_out.permute(1, 0, 2)
 
         long_out , _ = self.long_lstm(long_out_trans)
-
-        if self.args.use_res == True:
+        if self.args.use_res:
             graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             long_out = torch.cat([long_out, graph_emb], dim = 2)
             long_out = long_out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -1149,7 +1146,7 @@ class LongShort(ModelBase):
         #out_lstm , _ = self.lstm(encoded_layers[0])
 
 
-        if self.args.use_res == True:
+        if self.args.use_res:
             short_seq = input_dic['category']['assessmentItemID'][:, -self.max_seq_len:]
             padded_seq = self.short.pad(short_seq)
             graph_emb = self.short.get_graph_emb(padded_seq )
