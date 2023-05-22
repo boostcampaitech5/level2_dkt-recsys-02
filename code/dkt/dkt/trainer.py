@@ -10,7 +10,7 @@ from dkt import trainer
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, BERT, Saint, LastQuery, TransLSTM_G
+from .model import LSTM, LSTMATTN, BERT, Saint, LastQuery, TransLSTM_G,LongShort
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
@@ -45,9 +45,10 @@ def run(args,
         logger.info("Start Training: Epoch %s", epoch + 1)
 
         # TRAIN
+ 
         train_auc, train_acc, train_loss = train(train_loader=train_loader,
-                                                 model=model, optimizer=optimizer,
-                                                 scheduler=scheduler, args=args)
+                                                    model=model, optimizer=optimizer,
+                                                    scheduler=scheduler, args=args)
 
         # VALID
         auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
@@ -202,10 +203,12 @@ def train(train_loader: torch.utils.data.DataLoader,
     total_targets = []
     losses = []
     for step, batch in enumerate(train_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
-        #preds = model(**batch)
+        for key in batch:
+            tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+            batch[key] = tmp
+
         preds = model(batch)
-        targets = batch["answerCode"]
+        targets = batch['category']["answerCode"]
         
         loss = compute_loss(preds=preds, targets=targets)
         update_params(loss=loss, model=model, optimizer=optimizer,
@@ -236,7 +239,6 @@ def train(train_loader: torch.utils.data.DataLoader,
 
     return auc, acc, loss_avg
 
-
 def validate(valid_loader: nn.Module, model: nn.Module, args):
     model.eval()
 
@@ -252,7 +254,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
         
             #preds = model(**batch)
             preds = model(batch)
-            targets = batch["answerCode"]
+            targets = batch['category']["answerCode"]
 
             loss = compute_loss(preds=preds, targets=targets)
             # predictions
@@ -278,13 +280,18 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     return auc, acc, loss_avg
 
 
+
 def inference(args, test_data: np.ndarray, model: nn.Module) -> None:
     model.eval()
     _, test_loader = get_loaders(args=args, train=None, valid=test_data)
 
     total_preds = []
     for step, batch in enumerate(test_loader):
-        batch = {k: v.to(args.device) for k, v in batch.items()}
+         
+        for key in batch:
+            tmp = {k: v.to(args.device) for k, v in batch[key].items()}
+            batch[key] = tmp
+        
         #preds = model(**batch)
         preds = model(batch)
         # predictions
@@ -321,7 +328,8 @@ def get_model(args) -> nn.Module:
             "bert": BERT,
             'saint':Saint,
             'lastquery':LastQuery,
-            'translstm_g' :TransLSTM_G
+            'translstm_g' :TransLSTM_G,
+            'longshort':LongShort
         }.get(model_name)(**model_args)
   
     except KeyError:
@@ -353,7 +361,9 @@ def update_params(loss: torch.Tensor,
                   optimizer: torch.optim.Optimizer,
                   scheduler: torch.optim.lr_scheduler._LRScheduler,
                   args):
-    loss.backward()
+    if args.model.lower() == 'longshort': loss.backward(retain_graph=True)
+    else: loss.backward()
+    
     nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
     if args.scheduler == "linear_warmup":
         scheduler.step()

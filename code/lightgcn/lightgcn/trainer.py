@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch_geometric.nn.models import LightGCN
 import wandb
-
+import yaml
 from .utils import get_logger, logging_conf
 
 
@@ -72,7 +72,34 @@ def run(
     torch.save(obj={"model": model.state_dict(), "epoch": e + 1},
                f=os.path.join(model_dir, f"last_model.pt"))
     logger.info(f"Best Weight Confirmed : {best_epoch+1}'th epoch")
-    
+
+    if args.sweep_run:
+        val_loss_avg = sum(train_loss)/len(train_loss)
+        val_auc_avg = sum(train_acc)/len(train_acc)
+        val_acc_avg = sum(train_auc)/len( train_auc)
+        
+        wandb.log({
+            'val_loss': val_loss_avg,
+            'val_auc': val_auc_avg,
+            'val_acc': val_acc_avg,
+        })
+        
+        try:
+            with open('./sweep_best_auc.yaml') as file:
+                output = yaml.load(file, Loader=yaml.FullLoader)
+            file.close()
+        except:
+            with open('/opt/level2_dkt-recsys-02/code/lgcn/sweep_best_auc.yaml') as file:
+                output = yaml.load(file, Loader=yaml.FullLoader)
+            file.close()
+        if output[args.model.lower()]['best_auc'] < val_auc_avg:
+            output[args.model.lower()]['best_auc'] = float(val_auc_avg)
+            output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(float, dict(wandb.config).values())))
+            
+        with open('./sweep_best_auc.yaml', 'w') as file:
+            yaml.dump(output, file, default_flow_style=False)
+        file.close()
+        
     return model.get_embedding(train_data['edge']).detach().cpu().numpy()
 
 
