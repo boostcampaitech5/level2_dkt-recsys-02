@@ -105,6 +105,10 @@ def parse_args():
     parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
     parser.add_argument("--tuning_count", default=50, type=int, help="tuning count")
 
+    ### TabNet ###
+    parser.add_argument("--cat_emb_dim", default=1, type=int, help="categorical embedding dimensions")
+    parser.add_argument("--weights", default=False, type=bool, help="custom weights per class, 1 for auto")
+
     args = parser.parse_args()
 
     return args
