@@ -147,6 +147,7 @@ class Preprocess:
         df = elo(df)
         num_feature['dayname'] = df['dayname'].nunique()
         num_feature['bigclass'] = df['bigclass'].nunique()
+
         # 범주형 변수 : [KnowledgeTag,dayname, bigclass]
         # 추가된 피쳐
         # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
@@ -170,7 +171,7 @@ class Preprocess:
         #  'bigclass_count', #대분류별 문제 푼 횟수
         #  'elo' #유저의 문제풀이능력
 
-
+        
         curr_dir = __file__[:__file__.rfind('/')+1]
         with open(curr_dir + '../models_param/num_feature.json', 'w') as f: 
             json.dump(num_feature, f)
@@ -200,7 +201,7 @@ class Preprocess:
             np.load(os.path.join(self.args.asset_dir, "dayname_classes.npy"))
         )
         self.args.n_bigclass = len(
-            np.load(os.path.join(self.args.assest_dir, "bigclass_classes.npy"))
+            np.load(os.path.join(self.args.asset_dir, "bigclass_classes.npy"))
         )
 
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
@@ -212,12 +213,13 @@ class Preprocess:
                     "elapsed_med", "bigclass", "bigclasstime", "bigclass_acc",
                     "bigclass_sum", "bigclass_count", "elo","question_N"
                 ]
+        self.user_list = df['userID'].unique().tolist()
         self.userID = df['userID'].unique().tolist()
         self.assessmentItemID = df['assessmentItemID'].unique().tolist()
         self.testId = df['testId'].unique().tolist()
         self.answerCode = df['answerCode'].unique().tolist()
         self.KnowledgeTag = df['KnowledgeTag'].unique().tolist()
-        self.question_N = df['qunestion_N'].unique().tolist()
+        self.question_N = df['question_N'].unique().tolist()
         self.user_correct_answer = df['user_correct_answer'].unique().tolist()
         self.user_total_answer = df['user_total_answer'].unique().tolist()
         self.user_acc = df['user_acc'].unique().tolist()
@@ -276,8 +278,8 @@ class DKTDataset(torch.utils.data.Dataset):
                     r['elapsed'].values,
                     r['elapsed_cumsum'].values,
                     r['month'].values,
-                    r['day'].values,
                     r['hour'].values,
+                    r['day'].values,
                     r['dayname'].values,
                     r['elapsed_med'].values,
                     r['bigclass'].values,
@@ -298,7 +300,7 @@ class DKTDataset(torch.utils.data.Dataset):
             self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.question_N_list, self.user_correct_answer_list, self.user_total_answer_list, 
             self.user_acc_list, self.test_mean_list , self.test_mean_list , self.test_sum_list, self.tag_mean_list, self.tag_sum_list, self.elapsed_list,
             self.elapsed_cumsum_list, self.month_list, self.hour_list, self.day_list, self.dayname_list, self.elapsed_med_list, self.bigclass_list,self.bigclasstime_list,
-            self.bigclass_acc_list, self.bigclass_count_list, self.elo_list = self._data_augmentation()
+            self.bigclass_acc_list, self.bigclass_sum_list,self.bigclass_count_list, self.elo_list = self._data_augmentation()
 
     def __getitem__(self, index: int) -> dict:
 ####################Sliding Window 적용 시
@@ -365,8 +367,8 @@ class DKTDataset(torch.utils.data.Dataset):
                 "bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
                 "bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
                 "bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
-                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float)
-                "elo" : torch.tensor(elo, dtype=torch.float)
+                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
+                "elo" : torch.tensor(elo, dtype=torch.float),
                 
             }
             seq_len = len(answerCode)
@@ -384,14 +386,29 @@ class DKTDataset(torch.utils.data.Dataset):
                 mask[-seq_len:] = 1
 
             cat_data["mask"] = mask
+            #####cont
+            seq_len = len(answerCode)
+            
+            if seq_len > self.max_seq_len:
+                for k, seq in cont_data.items():
+                    cont_data[k] = seq[-self.max_seq_len:]
+                mask = torch.ones(self.max_seq_len, dtype=torch.int16)
+            else:
+                for k, seq in cont_data.items():
+                    # Pre-padding non-valid sequences
+                    tmp = torch.zeros(self.max_seq_len)
+                    tmp[self.max_seq_len-seq_len:] = cont_data[k]
+                    cont_data[k] = tmp
+                mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
+                mask[-seq_len:] = 1
+            cont_data["mask"] = mask 
+            
 ####################Sliding Window 미적용 시
         else:
             row = self.grouped_value[index]
 ####################FE 추가 시 추가해야함
-            assessmentItemID, testId, KnowledgeTag, answerCode, question_N, user_correct_answer, user_total_answer,
-            user_acc, test_mean, test_mean, test_sum, tag_mean, tag_sum, elapsed,
-            elapsed_cumsum, month, hour, day, dayname, elapsed_med, bigclass, bigclasstime,
-            bigclass_acc, bigclass_count, elo = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13], row[14], row[15], row[16], row[17], row[18],        row[19], row[20], row[21], row[22], row[23] ,row[24]
+            testId,assessmentItemID, KnowledgeTag, answerCode, question_N, user_correct_answer, user_total_answer,user_acc, test_mean, test_sum, tag_mean, tag_sum, elapsed,elapsed_cumsum, month, hour, day, dayname, elapsed_med, bigclass, bigclasstime, bigclass_acc,bigclass_sum ,bigclass_count, elo = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13], row[14], row[15], row[16], row[17], row[18], row[19], row[20], row[21], row[22], row[23] ,row[24] 
+
             
             cat_data = {
             "testId": torch.tensor(testId + 1, dtype=torch.int),
@@ -423,10 +440,15 @@ class DKTDataset(torch.utils.data.Dataset):
                 "bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
                 "bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
                 "bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
-                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float)
+                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
                 "elo" : torch.tensor(elo, dtype=torch.float)
                 
             }
+            len_cont = {}
+            len_cont['n_cont'] = len(cont_data)
+            curr_dir = __file__[:__file__.rfind('/')+1]
+            with open(curr_dir + '../models_param/len_cont.json', 'w') as f: 
+                json.dump(len_cont, f)
             
 ####################Mask 만들기       
             seq_len = len(answerCode)
@@ -444,7 +466,22 @@ class DKTDataset(torch.utils.data.Dataset):
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
             cat_data["mask"] = mask 
+            #####cont
+            seq_len = len(answerCode)
             
+            if seq_len > self.max_seq_len:
+                for k, seq in cont_data.items():
+                    cont_data[k] = seq[-self.max_seq_len:]
+                mask = torch.ones(self.max_seq_len, dtype=torch.int16)
+            else:
+                for k, seq in cont_data.items():
+                    # Pre-padding non-valid sequences
+                    tmp = torch.zeros(self.max_seq_len)
+                    tmp[self.max_seq_len-seq_len:] = cont_data[k]
+                    cont_data[k] = tmp
+                mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
+                mask[-seq_len:] = 1
+            cont_data["mask"] = mask 
         
 ####################Generate interaction
         interaction = cat_data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
@@ -454,13 +491,16 @@ class DKTDataset(torch.utils.data.Dataset):
         interaction = (interaction * interaction_mask).to(torch.int64)
         cat_data["interaction"] = interaction
         cat_data = {feature: feature_seq.int() for feature, feature_seq in cat_data.items()}
-
+        
+        ##cont
         cont_data = {feature: feature_seq.float() for feature, feature_seq in cont_data.items()}
 
         data = {}
         data['category'] = cat_data
         data['continous'] = cont_data
         
+
+        pdb.set_trace()
         return data
 
     def __len__(self) -> int:
@@ -590,7 +630,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     answerCode_list.append(answerCode[::-1])
                     #New Feature_list.append(New Feature[::-1])
                     question_N_list.append(question_N[::-1])
-                    userID_list.append([userID]* len(answerCode[::-1
+                    # userID_list.append([userID]* len(answerCode[::-1])
                     user_correct_answer_list.append(user_correct_answer[::-1])
                     user_total_answer_list.append(user_total_answer[::-1])
                     user_acc_list.append(user_acc[::-1])
@@ -675,10 +715,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     start_idx += self.window
 
         ######FE시에 추가해야함
-        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, question_N_list, user_correct_answer_list, user_total_answer_list,
-                user_acc_list, test_mean_list, test_mean_list, test_sum_list, tag_mean_list, tag_sum_list, elapsed_list,
-                elapsed_cumsum_list, month_list, hour_list, day_list, dayname_list, elapsed_med_list, bigclass_list, bigclasstime_list,
-                bigclass_acc_list, bigclass_count_list, elo_list
+        return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, question_N_list, user_correct_answer_list, user_total_answer_list, user_acc_list, test_mean_list, test_mean_list,test_sum_list, tag_mean_list, tag_sum_list, elapsed_list,elapsed_cumsum_list, month_list, hour_list, day_list, dayname_list, elapsed_med_list, bigclass_list, bigclasstime_list,bigclass_acc_list,bigclass_sum_list,bigclass_count_list, elo_list
 
 def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils.data.DataLoader]:
     pin_memory = False

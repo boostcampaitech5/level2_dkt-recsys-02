@@ -10,6 +10,9 @@ import torch.nn.init as init
 from .layer import SASRecBlock, PositionalEncoding, Feed_Forward_block
 import re
 import json
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 class GraphEmbedding:
     def __init__(self, args, model):
@@ -45,8 +48,8 @@ class ModelBase(nn.Module):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
-        # n_dayname : int = 7,
-        # n_bigclass : int = 9,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
 
         **kwargs
     ):
@@ -60,13 +63,16 @@ class ModelBase(nn.Module):
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
-        # self.n_dayname = n_dayname
-        # self.n_bigclass = n_bigclass
+        self.n_dayname = n_dayname
+        self.n_bigclass = n_bigclass
         self.resize_factor = self.args.resize_factor
 
         curr_dir = __file__[:__file__.rfind('/')+1]
         with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
+
+#         with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
+#             self.len_cont =  json.load(f)
 
 ########Graph Embedding\
         self.use_graph = self.args.use_graph
@@ -84,8 +90,8 @@ class ModelBase(nn.Module):
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
         self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
-        # self.embedding_dayname = nn.Embedding(n_dayname + 1, intd)
-        # self.embedding_bigclass = nn.Embedding(n_bigclass + 1, intd)
+        self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
+        self.embedding_bigclass = nn.Embedding(self.num_feature['bigclass'] + 1, intd)
         
 
 ######## FE시 추가해야함
@@ -96,25 +102,25 @@ class ModelBase(nn.Module):
         self.embedding_dict['interaction'] = self.embedding_interaction
         self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
-        # self.embedding_dict['dayname'] = self.embedding_dayname
-        # self.embedding_dict['bigclass'] = self.embedding_bigclass
+        self.embedding_dict['dayname'] = self.embedding_dayname
+        self.embedding_dict['bigclass'] = self.embedding_bigclass
 
 ########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
         if self.use_graph:
             self.comb_proj = nn.Sequential(
                 nn.Linear(intd * len(self.embedding_dict) + self.graph_emb_dim , hd//2),
-                nn.LayerNorm(hd, eps=1e-6)
+                nn.LayerNorm(hd//2, eps=1e-6)
             )     
         else:
             self.comb_proj = nn.Sequential(
                 nn.Linear(intd * len(self.embedding_dict) , hd//2),
-                nn.LayerNorm(hd, eps=1e-6)
+                nn.LayerNorm(hd//2, eps=1e-6)
             )
         ##재성##
-        # self.cont_proj = nn.Sequential(
-        #    nn.Linear(len(conti_list) , hd//2),
-        #    nn.LayerNorm(hd, eps=1e-6)
-        # )
+        self.cont_proj = nn.Sequential(
+           nn.Linear(19 , hd//2),
+           nn.LayerNorm(hd//2, eps=1e-6)
+        )
         
         #self.cont_proj = nn.Sequential(
         #    nn.Linear(n_cont , hd),
@@ -132,6 +138,7 @@ class ModelBase(nn.Module):
     def dic_embed(self, input_dic):
         
         input_dic = input_dic['category']
+        # pdb.set_trace()
         embed_list = []
         for feature, feature_seq in input_dic.items():
             if feature not in ('answerCode','mask'):
@@ -164,11 +171,15 @@ class ModelBase(nn.Module):
 #######Category
         input_cat = input_dic['category']
         embed_list = []
+        # pdb.set_trace()
         for feature, feature_seq in input_cat.items():
             batch_size = feature_seq.size(0)
             
             if feature not in ('answerCode','mask'):
-                embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+                try:
+                    embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+                except:
+                    pdb.set_trace()
 
         if self.use_graph: 
             embed_list.append(self.graph_emb.item_emb(input_cat['assessmentItemID'].long()))
@@ -177,19 +188,18 @@ class ModelBase(nn.Module):
         X = self.comb_proj(embed)
 
 #######Continous
-#         input_cont = input_dic['continous']
-#         conti_list = []
-#         for feature, feature_seq in input_cat.items():
-#             batch_size = feature_seq.size(0)
-            
-
-#             conti_list.append(feature_seq)
-#         conti = torch.cat(conti_list, dim = 2)
-#         X_conti = self.cont_proj(conti)
+        input_cont = input_dic['continous']
+        conti_list = []
+        for feature, feature_seq in input_cont.items():
+            batch_size = feature_seq.size(0)
+            conti_list.append(feature_seq.unsqueeze(dim=2))
+            pdb.set_trace()
+        conti = torch.cat(conti_list, dim = 2)
+        X_conti = self.cont_proj(conti)
         
-#         X_final = torch.concat(X,X_conti)
+        X_final = torch.concat(X,X_conti)
 
-        return X, batch_size
+        return X_final, batch_size #X,batch_size
 
     def short_forward(self, input_dic, length):
 
@@ -217,7 +227,7 @@ class ModelBase(nn.Module):
         return X, batch_size
 
 ######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction, dayname, bigclass):
+    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
         batch_size = interaction.size(0)
         # Embedding
         embed_interaction = self.embedding_interaction(interaction.long())
@@ -283,6 +293,7 @@ class LSTM(ModelBase):
         
    
         X, batch_size = super().dic_forward(input_dic)
+        # pdb.set_trace()
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)

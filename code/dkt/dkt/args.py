@@ -3,7 +3,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
+    
     parser.add_argument("--seed", default=42, type=int, help="seed")
     parser.add_argument("--device", default="cpu", type=str, help="cpu or gpu")
     parser.add_argument(
@@ -68,6 +68,8 @@ def parse_args():
         "--past_present", default=False, type=bool, help="use past and present at the same time"
     )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
+    
+    parser.add_argument('--n_cont', type=int, help='The number of continuous features')
 
     # 모델
     parser.add_argument(
