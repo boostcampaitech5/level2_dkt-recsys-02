@@ -39,6 +39,7 @@ def main(args: argparse.Namespace):
     
     logger.info("Start Training ...")
     graph_emb = trainer.run(
+        args=args,
         model=model,
         train_data=train_data,
         n_epochs=args.n_epochs,
