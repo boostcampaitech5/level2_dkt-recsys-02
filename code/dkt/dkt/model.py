@@ -71,8 +71,8 @@ class ModelBase(nn.Module):
         with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
 
-#         with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
-#             self.len_cont =  json.load(f)
+        with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
+            self.len_cont =  json.load(f)
 
 ########Graph Embedding\
         self.use_graph = self.args.use_graph
@@ -118,7 +118,7 @@ class ModelBase(nn.Module):
             )
         ##재성##
         self.cont_proj = nn.Sequential(
-           nn.Linear(19 , hd//2),
+           nn.Linear(self.len_cont['n_cont'] , hd//2),
            nn.LayerNorm(hd//2, eps=1e-6)
         )
         
@@ -193,12 +193,12 @@ class ModelBase(nn.Module):
         for feature, feature_seq in input_cont.items():
             batch_size = feature_seq.size(0)
             conti_list.append(feature_seq.unsqueeze(dim=2))
-            pdb.set_trace()
+
         conti = torch.cat(conti_list, dim = 2)
         X_conti = self.cont_proj(conti)
         
-        X_final = torch.concat(X,X_conti)
-
+        X_final = torch.cat([X,X_conti],dim =2)
+        # pdb.set_trace()
         return X_final, batch_size #X,batch_size
 
     def short_forward(self, input_dic, length):

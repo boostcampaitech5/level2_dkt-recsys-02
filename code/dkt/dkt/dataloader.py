@@ -13,7 +13,7 @@ import pdb
 from .featureEngineering import feature_engineering,elo
 import pickle
 import json
-
+from sklearn.preprocessing import StandardScaler
 
 class Preprocess:
     def __init__(self, args):
@@ -115,8 +115,14 @@ class Preprocess:
             df[col] = test
         
 ######### FE 시에  연속형 변수 추가 시 추가 부탁
+        numeric_cols = ["user_correct_answer", "user_total_answer", "user_acc",
+                    "test_mean", "test_sum", "tag_mean", "tag_sum",
+                    "elapsed", "elapsed_cumsum", "month", "day", "hour",
+                    "elapsed_med", "bigclasstime", "bigclass_acc",
+                    "bigclass_sum", "bigclass_count", "elo"]
         
-
+        scaler = StandardScaler()
+        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
         def convert_time(s: str):
             timestamp = time.mktime(
@@ -481,7 +487,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     cont_data[k] = tmp
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
-            cont_data["mask"] = mask 
+            # cont_data["mask"] = mask 
         
 ####################Generate interaction
         interaction = cat_data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
@@ -500,7 +506,7 @@ class DKTDataset(torch.utils.data.Dataset):
         data['continous'] = cont_data
         
 
-        pdb.set_trace()
+
         return data
 
     def __len__(self) -> int:
