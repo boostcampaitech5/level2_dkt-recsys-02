@@ -29,7 +29,7 @@ class GraphEmbedding:
             item_label.sort()
             for i, label in enumerate(item_label):
                 if i == 0:
-                    self.emb_dim = len(item_emb_dic[label])
+                    self.hidden_dim = len(item_emb_dic[label])
                     item_emb.append(item_emb_dic[label])
                 item_emb.append(item_emb_dic[label])
             item_emb = torch.tensor(item_emb).to(self.args.device)
@@ -69,22 +69,24 @@ class ModelBase(nn.Module):
         self.n_cont = n_cont
         self.resize_factor = self.args.resize_factor
 
+        self.positional_interaction1 = self.args.pos_int1
+        self.positional_interaction2 = self.args.pos_int2
+
+
         curr_dir = __file__[:__file__.rfind('/')+1]
-        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
-            self.num_feature =  json.load(f)
+        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f: self.num_feature =  json.load(f)
 
-        # with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
-        #     self.len_cont =  json.load(f)
-
-########Graph Embedding\
         self.use_graph = self.args.use_graph
         if self.use_graph:
             self.graph_emb = GraphEmbedding(args, self.args.graph_model)
-            self.graph_emb_dim = self.graph_emb.emb_dim
+            self.graph_emb_dim = self.args.graph_dim
 
 ######### Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
-        hd, intd = hidden_dim, hidden_dim // self.resize_factor
+        if args.model.lower() =='sakt':
+            hd, intd = hidden_dim, hidden_dim // self.args.n_heads
+        else:
+            hd, intd = hidden_dim, hidden_dim // self.resize_factor
 
         self.embedding_interaction = nn.Embedding(3, intd) # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_test = nn.Embedding(n_tests + 1, intd)
@@ -94,6 +96,13 @@ class ModelBase(nn.Module):
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
         self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
         self.embedding_bigclass = nn.Embedding(self.num_feature['bigclass'] + 1, intd)
+        
+
+        self.embedding_pos = nn.Embedding(self.max_seq_len, intd)
+
+        self.interaction_dic = {}
+        for i in range(n_questions+1):
+            self.interaction_dic[i] = nn.Embedding(3, intd)
         
 
 ######## FE시 추가해야함
@@ -134,6 +143,32 @@ class ModelBase(nn.Module):
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
             self.fc = nn.Linear(hd, 1)
+
+    def get_interaction1(self, interactions):
+
+        batch_size = interactions.size(0)
+        interaction_emb = self.embedding_dict['interaction'](interactions.long())
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+        pos_emb = self.embedding_pos(pos.cuda())
+        return interaction_emb + pos_emb
+    
+    def get_interaction2(self, item_seqs, interactions):
+
+        batch_size = item_seqs.size(0)
+        emb_list = []
+        for item_seq, interaction in zip(item_seqs, interactions):
+            tmp = []
+            for id, it in zip(item_seq, interaction):
+                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+            emb_list.append(torch.cat(tmp, dim = 1))
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+   
+        pos_emb = self.embedding_pos(pos.cuda())
+        interaction_emb = torch.cat(emb_list, dim = 0).cuda()
+       
+        return interaction_emb + pos_emb
+
 
     def get_graph_emb_dim(self): return self.graph_emb_dim
 
@@ -177,17 +212,23 @@ class ModelBase(nn.Module):
         for feature, feature_seq in input_cat.items():
             batch_size = feature_seq.size(0)
             
-            if feature not in ('answerCode','mask'):
-                try:
-                    embed_list.append(self.embedding_dict[feature](feature_seq.long()))
-                except:
-                    pdb.set_trace()
+            if feature not in ('answerCode','mask', 'interaction'):
+                embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+            if feature == 'interaction':
+                if self.positional_interaction1:
+                    embed_list.append(self.get_interaction1(input_cat['interaction'].long()))
+                elif self.positional_interaction2:
+                    embed_list.append(self.get_interaction2(input_cat['assessmentItemID'].long(), input_cat['interaction'].long()))
+                else:
+                    embed_list.append(self.embedding_dict['interaction'](feature_seq.long()))
+
 
         if self.use_graph: 
             embed_list.append(self.graph_emb.item_emb(input_cat['assessmentItemID'].long()))
 
+    
         embed = torch.cat(embed_list, dim = 2)
-        X = self.comb_proj(embed)
+        X_Cat = self.comb_proj(embed)
 
 #######Continous
         input_cont = input_dic['continous']
@@ -199,8 +240,8 @@ class ModelBase(nn.Module):
         conti = torch.cat(conti_list, dim = 2)
         X_conti = self.cont_proj(conti)
         
-        X_final = torch.cat([X,X_conti],dim =2)
-        # pdb.set_trace()
+        X_final = torch.cat([X_Cat, X_conti],dim =2)
+
         return X_final, batch_size #X,batch_size
 
     def short_forward(self, input_dic, length):
@@ -227,31 +268,6 @@ class ModelBase(nn.Module):
 #######Continous
 
         return X, batch_size
-
-######################## FE시 추가해야함
-    def forward(self, testId, assessmentItemID, KnowledgeTag, answerCode, mask, interaction):
-        batch_size = interaction.size(0)
-        # Embedding
-        embed_interaction = self.embedding_interaction(interaction.long())
-        embed_test = self.embedding_test(testId.long())
-        embed_question = self.embedding_question(assessmentItemID.long())
-        embed_tag = self.embedding_tag(KnowledgeTag.long())
-        # embed_dayname = self.embedding_dayname(dayname.long())
-        # embed_bigclass = self.embedding_bigclass(bigcalass.long())
-        embed = torch.cat(
-            [
-                embed_interaction,
-                embed_test,
-                embed_question,
-                embed_tag,
-                # embed_dayname,
-                # embed_bigclass,
-            ],
-            dim=2,
-        )
-        X = self.comb_proj(embed)
-        return X, batch_size
-
 
 class LSTM(ModelBase):
     def __init__(
@@ -344,20 +360,13 @@ class LSTMATTN(ModelBase):
         self.attn = BertEncoder(self.config)
     ######################## FE시 추가해야함
     def forward(self, input_dic):
-        #X, batch_size = super().forward(testId=testId,
-        #                                assessmentItemID=assessmentItemID,
-        #                                KnowledgeTag=KnowledgeTag,
-        #                                answerCode=answerCode,
-        #                                mask=mask,
-        #                                interaction=interaction,
-        #                                 dayname = dayname,
-        #                                 bigclass = bigclass,)
+
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
 
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
-
+   
         extended_attention_mask = mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = extended_attention_mask.to(dtype=torch.float32)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
@@ -367,13 +376,12 @@ class LSTMATTN(ModelBase):
         sequence_output = encoded_layers[-1]
 
         if self.args.use_res:
-            graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
-            sequence_output = torch.cat([sequence_output, graph_out], dim = 2)
-            sequence_output = sequence_output.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
+            out = torch.cat([sequence_output, out], dim = 2)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim * 2)
         else:
-            sequence_output = sequence_output.contiguous().view(batch_size, -1, self.hidden_dim)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim)
 
-        out = self.fc(sequence_output).view(batch_size, -1)
+        out = self.fc(out).view(batch_size, -1)
         return out
 
 
@@ -399,9 +407,7 @@ class BERT(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            # n_tags,
-            # n_dayname,
-            n_bigclass
+
         )
         self.n_heads = n_heads
         self.drop_out = drop_out
@@ -438,153 +444,6 @@ class BERT(ModelBase):
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)
         return out
-
-
-
-
-class TransformerAndLSTMEncoderDeocoderEachEmbedding(ModelBase):
-    def __init__(self, 
-                args, 
-                hidden_dim: int = 64, 
-                n_layers: int = 2,
-                n_tests: int = 1538,
-                n_questions: int = 9455,
-                n_tags: int = 913):
-
-        super().__init__(
-            args,
-            hidden_dim,
-            n_layers,
-            n_tests,
-            n_questions,
-            n_tags
-        )
-        self.n_tests = n_tests
-        self.n_questions = n_questions
-        self.n_tags = n_tags
-
-        self.args = args
-        self.n_heads = self.args.n_heads
-        
-
-        self.embedding_size = self.hidden_dim // 3
-        #self.num_large_paper_number = self.args.num_large_paper_number
-        #self.num_hour = self.args.num_hour
-        #self.num_dayofweek = self.args.num_dayofweek
-        #self.num_week_number = self.args.num_week_number
-
-        self.now_cat_cols = ["now_testId", "now_assessmentItemID", "now_KnowledgeTag", "now_answerCode"]
-        self.past_cat_cols = ["past_testId", "past_assessmentItemID", "past_KnowledgeTag", "past_answerCode"]
-
-        #self.num_cols = self.args.num_cols
-
-        self.hidden_dim = hidden_dim
-
-
-        self.num_heads = self.n_heads
-        self.num_layers = n_layers
-        self.dropout_rate = self.args.drop_out
-        self.device = self.args.device
-        self.use_graph = self.args.use_graph
-
-        if self.use_graph:
-            self.graph_emb = GraphEmbedding(args, self.args.graph_model)
-            self.graph_emb_dim = self.graph_emb.emb_dim
-
-        # past
-        past_emb = {}
-        for cat_col in self.past_cat_cols:
-            if cat_col == 'past_assessmentItemID':
-                past_emb[cat_col] = nn.Embedding(self.n_questions + 1, self.embedding_size, padding_idx = 0) # 문항에 대한 정보
-            elif cat_col == 'past_testId':
-                past_emb[cat_col] = nn.Embedding(self.n_tests + 1, self.embedding_size, padding_idx = 0) # 시험지에 대한 정보
-            elif cat_col == 'past_KnowledgeTag':
-                past_emb[cat_col] = nn.Embedding(self.n_tags + 1, self.embedding_size, padding_idx = 0) # 지식 태그에 대한 정보
-            elif cat_col == 'past_answerCode':
-                past_emb[cat_col] = nn.Embedding(3, self.embedding_size, padding_idx = 0) # 지식 태그에 대한 정보
-
-        self.past_emb_dict = nn.ModuleDict(past_emb)
-
-        self.past_answerCode_emb = nn.Embedding(3, self.hidden_dim, padding_idx = 0) # 문제 정답 여부에 대한 정보
-
-        if self.use_graph:
-            self.past_cat_emb = nn.Sequential(
-                nn.Linear(len(self.past_cat_cols) * self.embedding_size + self.graph_emb_dim , self.hidden_dim // 2),
-                nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-                )
-        else:
-            self.past_cat_emb = nn.Sequential(
-                nn.Linear(len(self.past_cat_cols) * self.embedding_size, self.hidden_dim // 2),
-                nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-                )
-        
-        #self.past_num_emb = nn.Sequential(
-        #    nn.Linear(len(self.num_cols), self.hidden_dim // 2),
-        #    nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-        #    )
-
-        self.emb_layernorm = nn.LayerNorm(self.hidden_dim, eps=1e-6)
-
-        self.past_lstm = nn.LSTM(
-            input_size = self.hidden_dim,
-            hidden_size = self.hidden_dim,
-            num_layers = self.num_layers,
-            batch_first = True,
-            bidirectional = False,
-            dropout = self.dropout_rate,
-            )
-
-        self.past_blocks = nn.ModuleList([SASRecBlock(self.n_heads, self.hidden_dim, self.dropout_rate) for _ in range(self.n_layers)])
-
-        # now
-
-        now_emb = {}
-        for cat_col in self.now_cat_cols:
-            if cat_col == 'now_assessmentItemID':
-                now_emb[cat_col] = nn.Embedding(self.n_questions + 1, self.embedding_size, padding_idx = 0) # 문항에 대한 정보
-            elif cat_col == 'now_testId':
-                now_emb[cat_col] = nn.Embedding(self.n_tests + 1, self.embedding_size, padding_idx = 0) # 시험지에 대한 정보
-            elif cat_col == 'now_KnowledgeTag':
-                now_emb[cat_col] = nn.Embedding(self.n_tags + 1, self.embedding_size, padding_idx = 0) # 지식 태그에 대한 정보
-
-
-        self.now_emb_dict = nn.ModuleDict(now_emb)
-
-        if self.use_graph:
-            self.now_cat_emb = nn.Sequential(
-                nn.Linear(len(self.now_cat_cols) * self.embedding_size + self.graph_emb_dim, self.hidden_dim // 2),
-                nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-            )
-        else:
-            self.now_cat_emb = nn.Sequential(
-                nn.Linear(len(self.now_cat_cols) * self.embedding_size, self.hidden_dim // 2),
-                nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-            )
-        
-        #self.now_num_emb = nn.Sequential(
-        #    nn.Linear(len(self.num_cols), self.hidden_dim // 2),
-        #    nn.LayerNorm(self.hidden_dim // 2, eps=1e-6)
-        #)
-
-        self.now_lstm = nn.LSTM(
-            input_size = self.hidden_dim,
-            hidden_size = self.hidden_dim,
-            num_layers = self.num_layers,
-            batch_first = True,
-            bidirectional = False,
-            dropout = self.dropout_rate,
-            )
-
-        self.now_blocks = nn.ModuleList([SASRecBlock(self.num_heads, self.hidden_dim, self.dropout_rate) for _ in range(self.num_layers)])
-
-        # predict
-
-        self.dropout = nn.Dropout(self.dropout_rate)
-
-        self.predict_layer = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, 1),
-            nn.Sigmoid()
-        )
     
     
     def forward(self, input_dic):
@@ -916,8 +775,8 @@ class TransLSTM_G(ModelBase):
         self.max_seq_len = self.args.max_seq_len
         self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
-        self.max_seq_len = self.args.max_seq_len
-
+        
+        self.use_res = self.args.use_res
         # Bert config
         self.graph_dim = super().get_graph_emb_dim()
         self.device = self.args.device
@@ -1084,10 +943,10 @@ class NoamOpt:
         self.dec_mask = None
         self.enc_dec_mask = None
 
-        if self.residual_connection:
-            self.fc = nn.Linear(self.hidden_dim + self.graph_dim, 1)
+        if self.use_res:
+            self.fc = nn.Linear(self.hidden_dim + self.hidden_dim, 1)
         else:
-            self.fc = nn.Linear(self.hidden_dim*2, 1)
+            self.fc = nn.Linear(self.hidden_dim, 1)
 
     def get_mask(self, seq_len):
         mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
@@ -1100,9 +959,6 @@ class NoamOpt:
         #                                answerCode=answerCode,
         #                                mask=mask,
         #                                interaction=interaction)
-
-
-
         mask = input_dic['category']['mask']
 
         #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
@@ -1136,17 +992,14 @@ class NoamOpt:
                                memory_mask=self.enc_dec_mask)
         out = out.permute(1, 0, 2)
 
-        out, _ = self.lstm(out)
+        out_lstm, _ = self.lstm(out)
         #out_lstm , _ = self.lstm(encoded_layers[0])
-
+    
         if self.args.use_res:
-            graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
-            out = torch.cat([out, graph_emb], dim = 2)
-            out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
+            out = torch.cat([out_lstm, out], dim = 2).contiguous().view(batch_size, -1, self.hidden_dim*2)
         else:
             out = out.contiguous().view(batch_size, -1, self.hidden_dim)
-
-        
+    
         out = self.fc(out).view(batch_size, -1)
         return out
 
@@ -1362,3 +1215,212 @@ class LongShort(ModelBase):
         out = self.fc_last(out).view(batch_size, -1)
 
         return out
+
+
+
+
+class SAKT(ModelBase):  
+    def __init__(
+        self,
+        args,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        drop_out: float = 0.1,
+        max_seq_len: float = 20,
+        **kwargs
+    ):
+        super().__init__(
+            args,
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+        self.args = args
+        self.n_heads = args.n_heads
+        self.max_seq_len = self.args.max_seq_len
+        self.drop_out = args.drop_out
+        self.hidden_dim = args.hidden_dim
+
+        
+
+        self.linear = nn.ModuleList( [nn.Linear(in_features= self.hidden_dim , out_features= self.hidden_dim ) for x in range(3)] )   # Linear projection for each embedding 
+        self.attn = nn.MultiheadAttention(embed_dim= self.hidden_dim , num_heads= self.n_heads, dropout= self.drop_out )                                   
+        self.ffn = nn.ModuleList([nn.Linear(in_features= self.hidden_dim  , out_features=self.hidden_dim , bias= True) for x in range(2)])  # feed forward layers post attention
+
+        self.linear_out = nn.Linear(in_features= self.hidden_dim  , out_features= 1 , bias=True) 
+        self.layer_norm1 = nn.LayerNorm( self.hidden_dim )
+        self.layer_norm2 = nn.LayerNorm( self.hidden_dim )                           # output with correctnness prediction 
+        self.drop = nn.Dropout(self.drop_out)
+
+
+        self.embedding_pos = nn.Embedding(self.max_seq_len, self.hidden_dim)
+
+        self.interaction_dic = {}
+        for i in range(n_questions+1):
+            self.interaction_dic[i] = nn.Embedding(3, self.hidden_dim)
+        
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy( np.triu(np.ones((seq_len ,seq_len)), k=1).astype('bool')) 
+        return mask
+    
+    def get_interaction(self, item_seqs, interactions):
+
+        batch_size = item_seqs.size(0)
+        emb_list = []
+        for item_seq, interaction in zip(item_seqs, interactions):
+            tmp = []
+            for id, it in zip(item_seq, interaction):
+                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+            emb_list.append(torch.cat(tmp, dim = 1))
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+   
+        pos_emb = self.embedding_pos(pos.cuda())
+        interaction_emb = torch.cat(emb_list, dim = 0).cuda()
+       
+        return interaction_emb + pos_emb
+    
+    def forward(self ,input_dic):
+
+
+        interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
+                                                        input_dic['category']['interaction'])
+
+        ## split the interaction embeding into v and k ( needs to verify if it is slpited or not)
+        value_in = interaction_emb
+        key_in   = interaction_emb                                        #print('v,k ', value_in.shape)
+        
+        ## get the excercise embedding output
+        
+        item_emb, batch_size = super().dic_forward(input_dic)                       # (b,n) --> (b,n,d) #print(query_ex.shape)
+
+        ## Linearly project all the embedings
+        value_in = self.linear[0](value_in).permute(1,0,2).cuda()       # (b,n,d) --> (n,b,d)
+        key_in = self.linear[1](key_in).permute(1,0,2).cuda()
+        query_ex =  self.linear[2](item_emb).permute(1,0,2).cuda()
+
+        ## pass through multihead attention
+        att_mask = self.get_mask(self.max_seq_len).cuda()
+        atn_out , _ = self.attn(query_ex , key_in, value_in , attn_mask= att_mask)     # lower triangular mask, bool, torch    (n,b,d)
+        atn_out = query_ex + atn_out                                  # Residual connection ; added excercise embd as residual because previous ex may have imp info, suggested in paper.
+        atn_out = self.layer_norm1( atn_out )                          # Layer norm                        #print('atn',atn_out.shape) #n,b,d = atn_out.shape
+
+        #take batch on first axis 
+        atn_out = atn_out.permute(1,0,2)                              #  (n,b,d) --> (b,n,d)
+        atn_out = atn_out.contiguous().view(batch_size, -1, self.hidden_dim)
+        ## FFN 
+        return self.fc(atn_out).view(batch_size, -1)
+
+
+class SAKTLSTM(ModelBase):  
+    def __init__(
+        self,
+        args,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        drop_out: float = 0.1,
+        max_seq_len: float = 20,
+        **kwargs
+    ):
+        super().__init__(
+            args,
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+        self.args = args
+        self.n_heads = args.n_heads
+        self.max_seq_len = self.args.max_seq_len
+        self.drop_out = args.drop_out
+        self.hidden_dim = args.hidden_dim
+
+        
+
+        self.linear = nn.ModuleList( [nn.Linear(in_features= self.hidden_dim , out_features= self.hidden_dim ) for x in range(3)] )   # Linear projection for each embedding 
+        self.attn = nn.MultiheadAttention(embed_dim= self.hidden_dim , num_heads= self.n_heads, dropout= self.drop_out )                                   
+        self.ffn = nn.ModuleList([nn.Linear(in_features= self.hidden_dim  , out_features=self.hidden_dim , bias= True) for x in range(2)])  # feed forward layers post attention
+
+        self.linear_out = nn.Linear(in_features= self.hidden_dim  , out_features= 1 , bias=True) 
+        self.layer_norm1 = nn.LayerNorm( self.hidden_dim )
+        self.layer_norm2 = nn.LayerNorm( self.hidden_dim )                           # output with correctnness prediction 
+        self.drop = nn.Dropout(self.drop_out)
+
+        self.lstm = nn.LSTM(
+            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+        )
+
+        self.embedding_pos = nn.Embedding(self.max_seq_len, self.hidden_dim)
+
+        self.interaction_dic = {}
+        for i in range(n_questions+1):
+            self.interaction_dic[i] = nn.Embedding(3, self.hidden_dim)
+        
+        if self.use_res:
+            self.fc = nn.Linear(self.hidden_dim + self.hidden_dim, 1)
+        else:
+            self.fc = nn.Linear(self.hidden_dim, 1)
+
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy( np.triu(np.ones((seq_len ,seq_len)), k=1).astype('bool')) 
+        return mask
+    
+    def get_interaction(self, item_seqs, interactions):
+
+        batch_size = item_seqs.size(0)
+        emb_list = []
+        for item_seq, interaction in zip(item_seqs, interactions):
+            tmp = []
+            for id, it in zip(item_seq, interaction):
+                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+            emb_list.append(torch.cat(tmp, dim = 1))
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+   
+        pos_emb = self.embedding_pos(pos.cuda())
+        interaction_emb = torch.cat(emb_list, dim = 0).cuda()
+       
+        return interaction_emb + pos_emb
+    
+    def forward(self ,input_dic):
+
+
+        interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
+                                                        input_dic['category']['interaction'])
+
+        ## split the interaction embeding into v and k ( needs to verify if it is slpited or not)
+        value_in = interaction_emb
+        key_in   = interaction_emb                                        #print('v,k ', value_in.shape)
+        
+        ## get the excercise embedding output
+        
+        item_emb, batch_size = super().dic_forward(input_dic)                       # (b,n) --> (b,n,d) #print(query_ex.shape)
+
+        ## Linearly project all the embedings
+        value_in = self.linear[0](value_in).permute(1,0,2).cuda()       # (b,n,d) --> (n,b,d)
+        key_in = self.linear[1](key_in).permute(1,0,2).cuda()
+        query_ex =  self.linear[2](item_emb).permute(1,0,2).cuda()
+
+        ## pass through multihead attention
+        att_mask = self.get_mask(self.max_seq_len).cuda()
+        atn_out , _ = self.attn(query_ex , key_in, value_in , attn_mask= att_mask)     # lower triangular mask, bool, torch    (n,b,d)
+        atn_out = query_ex + atn_out                                  # Residual connection ; added excercise embd as residual because previous ex may have imp info, suggested in paper.
+        atn_out = self.layer_norm1( atn_out )                          # Layer norm                        #print('atn',atn_out.shape) #n,b,d = atn_out.shape
+
+        #take batch on first axis 
+        atn_out = atn_out.permute(1,0,2)                              #  (n,b,d) --> (b,n,d)
+        out, _ = self.lstm(atn_out)
+        if self.use_res: out = torch.cat([out, atn_out], dim = 2).contiguous().view(batch_size, -1, self.hidden_dim*2)
+        else: out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        return self.fc(out).view(batch_size, -1)

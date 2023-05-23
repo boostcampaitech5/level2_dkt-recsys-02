@@ -30,8 +30,16 @@ lstm:
     max_seq_len: 25.0
     n_epochs: 100.0
 lstmattn:
-  best_auc: -1
-  parameter: null
+  best_auc: 0.7700055715859752
+  parameter:
+    batch_size: 32.0
+    drop_out: 0.2240276820435132
+    hidden_dim: 318.0
+    lr: 0.0038132027810098674
+    max_seq_len: 46.0
+    n_layers: 2.0
+    shuffle_n: 1.0
+    use_res: 0.0
 saint:
   best_auc: -1
   parameter: null

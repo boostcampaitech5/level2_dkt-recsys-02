@@ -10,7 +10,7 @@ from dkt import trainer
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, BERT, Saint, LastQuery, TransLSTM_G,LongShort
+from .model import LSTM, LSTMATTN, BERT, Saint, LastQuery, TransLSTM_G,LongShort, SAKT, SAKTLSTM
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .utils import get_logger, logging_conf
@@ -338,7 +338,9 @@ def get_model(args) -> nn.Module:
             'saint':Saint,
             'lastquery':LastQuery,
             'translstm_g' :TransLSTM_G,
-            'longshort':LongShort
+            'longshort':LongShort,
+            'sakt': SAKT,
+            'saktlstm':SAKTLSTM
         }.get(model_name)(**model_args)
   
     except KeyError:
