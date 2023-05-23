@@ -53,7 +53,6 @@ def config2args(args):
     for key, value in dict(wandb.config).items():
         temp[key] = value
        
-    pdb.set_trace()
     return args
 
 def graph_name_parser(args):
