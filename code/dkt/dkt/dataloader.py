@@ -309,10 +309,7 @@ class DKTDataset(torch.utils.data.Dataset):
         self.data_augmentation = self.args.data_augmentation
         #######Sliding Window 적용해 데이터 증가, FE 시에 feature 추가해야함
         if self.data_augmentation:
-            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.question_N_list, self.user_correct_answer_list, self.user_total_answer_list, 
-            self.user_acc_list, self.test_mean_list , self.test_mean_list , self.test_sum_list, self.tag_mean_list, self.tag_sum_list, self.elapsed_list,
-            self.elapsed_cumsum_list, self.month_list, self.hour_list, self.day_list, self.dayname_list, self.elapsed_med_list, self.bigclass_list,self.bigclasstime_list,
-            self.bigclass_acc_list, self.bigclass_sum_list,self.bigclass_count_list, self.elo_list = self._data_augmentation()
+            self.assessmentItemID_list, self.testId_list, self.KnowledgeTag_list, self.answerCode_list, self.question_N_list, self.user_correct_answer_list, self.user_total_answer_list, self.user_acc_list, self.test_mean_list , self.test_mean_list , self.test_sum_list, self.tag_mean_list, self.tag_sum_list, self.elapsed_list,self.elapsed_cumsum_list, self.month_list, self.hour_list, self.day_list, self.dayname_list, self.elapsed_med_list, self.bigclass_list,self.bigclasstime_list,self.bigclass_acc_list, self.bigclass_sum_list,self.bigclass_count_list, self.elo_list = self._data_augmentation()
 
     def __getitem__(self, index: int) -> dict:
 ####################Sliding Window 적용 시
@@ -413,7 +410,7 @@ class DKTDataset(torch.utils.data.Dataset):
                     cont_data[k] = tmp
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
-            cont_data["mask"] = mask 
+            # cont_data["mask"] = mask 
             
 ####################Sliding Window 미적용 시
         else:
@@ -456,12 +453,7 @@ class DKTDataset(torch.utils.data.Dataset):
                 "elo" : torch.tensor(elo, dtype=torch.float)
                 
             }
-            len_cont = {}
-            len_cont['n_cont'] = len(cont_data)
-            curr_dir = __file__[:__file__.rfind('/')+1]
-            with open(curr_dir + '../models_param/len_cont.json', 'w') as f: 
-                json.dump(len_cont, f)
-            
+
 ####################Mask 만들기       
             seq_len = len(answerCode)
 
@@ -472,8 +464,10 @@ class DKTDataset(torch.utils.data.Dataset):
             else:
                 for k, seq in cat_data.items():
                     # Pre-padding non-valid sequences
+                    pdb.set_trace()
                     tmp = torch.zeros(self.max_seq_len)
                     tmp[self.max_seq_len-seq_len:] = cat_data[k]
+                    # tmp[self.max_seq_len-seq_len:self.max_seq_len] = cat_data[k]
                     cat_data[k] = tmp
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
@@ -494,6 +488,11 @@ class DKTDataset(torch.utils.data.Dataset):
                 mask = torch.zeros(self.max_seq_len, dtype=torch.int16)
                 mask[-seq_len:] = 1
             # cont_data["mask"] = mask 
+        len_cont = {}
+        len_cont['n_cont'] = len(cont_data)
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + '../models_param/len_cont.json', 'w') as f: 
+            json.dump(len_cont, f)
         
 ####################Generate interaction
         interaction = cat_data["answerCode"] + 1  # 패딩을 위해 correct값에 1을 더해준다.
@@ -704,26 +703,26 @@ class DKTDataset(torch.utils.data.Dataset):
                         #New Feature_list.append(New Feature[start_idx: start_idx + self.max_seq_len][::-1])
                         # userID_list.append([userID]* len(answerCode[::-1]))
                         question_N_list.append(question_N[start_idx: start_idx + self.max_seq_len][::-1])                                        
-                        user_correct_answer_list = user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1]
-                        user_total_answer_list = user_total_answer[start_idx: start_idx + self.max_seq_len][::-1]
-                        user_acc_list = user_acc[start_idx: start_idx + self.max_seq_len][::-1]
-                        test_mean_list = test_mean[start_idx: start_idx + self.max_seq_len][::-1]
-                        test_sum_list = test_sum[start_idx: start_idx + self.max_seq_len][::-1]
-                        tag_mean_list = tag_mean[start_idx: start_idx + self.max_seq_len][::-1]
-                        tag_sum_list = tag_sum[start_idx: start_idx + self.max_seq_len][::-1]
-                        elapsed_list = elapsed[start_idx: start_idx + self.max_seq_len][::-1]
-                        elapsed_cumsum_list = elapsed_cumsum[start_idx: start_idx + self.max_seq_len][::-1]
-                        month_list = month[start_idx: start_idx + self.max_seq_len][::-1]
-                        day_list = day[start_idx: start_idx + self.max_seq_len][::-1]
-                        hour_list = hour[start_idx: start_idx + self.max_seq_len][::-1]
-                        dayname_list = dayname[start_idx: start_idx + self.max_seq_len][::-1]
-                        elapsed_med_list = elapsed_med[start_idx: start_idx + self.max_seq_len][::-1]
-                        bigclass_list = bigclass[start_idx: start_idx + self.max_seq_len][::-1]
-                        bigclasstime_list = bigclasstime[start_idx: start_idx + self.max_seq_len][::-1]
-                        bigclass_acc_list = bigclass_acc[start_idx: start_idx + self.max_seq_len][::-1]
-                        bigclass_sum_list = bigclass_sum[start_idx: start_idx + self.max_seq_len][::-1]
-                        bigclass_count_list = bigclass_count[start_idx: start_idx + self.max_seq_len][::-1]
-                        elo_list = elo[start_idx: start_idx + self.max_seq_len][::-1]
+                        user_correct_answer_list.append(user_correct_answer[start_idx: start_idx + self.max_seq_len][::-1])
+                        user_total_answer_list.append(user_total_answer[start_idx: start_idx + self.max_seq_len][::-1])
+                        user_acc_list.append(user_acc[start_idx: start_idx + self.max_seq_len][::-1])
+                        test_mean_list.append(test_mean[start_idx: start_idx + self.max_seq_len][::-1])
+                        test_sum_list.append(test_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        tag_mean_list.append(tag_mean[start_idx: start_idx + self.max_seq_len][::-1])
+                        tag_sum_list.append(tag_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_list.append(elapsed[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_cumsum_list.append(elapsed_cumsum[start_idx: start_idx + self.max_seq_len][::-1])
+                        month_list.append(month[start_idx: start_idx + self.max_seq_len][::-1])
+                        day_list.append(day[start_idx: start_idx + self.max_seq_len][::-1])
+                        hour_list.append(hour[start_idx: start_idx + self.max_seq_len][::-1])
+                        dayname_list.append(dayname[start_idx: start_idx + self.max_seq_len][::-1])
+                        elapsed_med_list.append(elapsed_med[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_list.append(bigclass[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclasstime_list.append(bigclasstime[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_acc_list.append(bigclass_acc[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_sum_list.append(bigclass_sum[start_idx: start_idx + self.max_seq_len][::-1])
+                        bigclass_count_list.append(bigclass_count[start_idx: start_idx + self.max_seq_len][::-1])
+                        elo_list.append(elo[start_idx: start_idx + self.max_seq_len][::-1])
                     start_idx += self.window
 
         ######FE시에 추가해야함
