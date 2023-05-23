@@ -7,7 +7,7 @@ lstm:
     # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
     # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
     n_epochs:
-      value: 100
+      value: 30
     drop_out:
     # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
       min: 0.0
@@ -17,10 +17,15 @@ lstm:
     batch_size:
       values: [64, 128, 256, 512]
     lr:
-      values: [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+      min: 1e-4
+      max: 1e-2
     max_seq_len:
       min: 5
       max: 50
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 bert:
@@ -30,21 +35,26 @@ bert:
     goal: maximize
   parameters:
     lr:
-      values: [1e-2, 1e-3, 1e-4]
+      min: 1e-4
+      max: 1e-2
     n_epochs:      
-      value: 100
+      value: 30
     drop_out:
       min: 0.0
       max: 0.5
     hidden_dim:
-      values : [16,32,64,128,256,512]
+      values : [32,64,128,256,512]
     n_layers:
       min: 1 
       max: 10
     n_heads:
-      values: [1,2,4,8]
+      values: [1,2,4,8,16,32]
     batch_size:
       values: [64,128,256,512]
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 lastquery:
@@ -78,7 +88,7 @@ translstm_g:
     n_heads:
       values: [2, 4, 8]
     graph_dim:
-      values: [64, 128, 256]
+      values: [256, 236, 206, 255, 250, 246, 205]
     drop_out:
       min: 0.0
       max: 0.5
@@ -93,7 +103,13 @@ translstm_g:
       min: 1
       max: 50
     use_res:
-      values: [True, False]
+      values:
+        - True
+        - False
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 lstmattn:
@@ -121,7 +137,15 @@ lstmattn:
     shuffle_n:
       values: [0, 1, 2]
     use_res:
-      values: [True, False]
+      values:
+        - True
+        - False
+    graph_dim:
+      values: [256, 236, 206, 255, 250, 246, 205]
+    pos_int1:
+      values:
+        - True
+        - False
 
 sakt:
   method: bayes
@@ -148,7 +172,13 @@ sakt:
     shuffle_n:
       values: [0, 1, 2]
     use_res:
-      values: [True, False]
+      values:
+        - True
+        - False
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 saktlstm:
@@ -176,7 +206,15 @@ saktlstm:
     shuffle_n:
       values: [0, 1, 2]
     use_res:
-      values: [True, False]
+      values:
+        - True
+        - False
+    graph_dim:
+      values: [256, 236, 206, 255, 250, 246, 205]
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 tabnet:
@@ -192,7 +230,7 @@ tabnet:
     batch_size:
       values: [256, 512, 1024, 2048, 4096, 8192, 16384]
     hidden_dim:
-      values: [8, 16, 32, 64, 128]
+      values: [4, 8, 16, 32, 64]
     cat_emb_dim:
       min: 1
       max: 10
@@ -203,4 +241,6 @@ tabnet:
       min: 1
       max: 10
     weights:
-      values: [True, False]
+      values:
+        - True
+        - False
