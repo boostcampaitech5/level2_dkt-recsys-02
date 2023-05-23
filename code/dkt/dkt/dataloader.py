@@ -146,7 +146,7 @@ class Preprocess:
         df = feature_engineering(df)
         df = elo(df)
         num_feature['dayname'] = df['dayname'].nunique()
-        num_feature['bigclass'] = df['bigclass']nunique()
+        num_feature['bigclass'] = df['bigclass'].nunique()
         # 범주형 변수 : [KnowledgeTag,dayname, bigclass]
         # 추가된 피쳐
         # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
