@@ -105,8 +105,6 @@ lstmattn:
       min: 16
       max: 1024
     shuffle_n:
-      values: [1, 2, 3, 4, 5]
-    #window: seq_len에 adaptive하게 조정이 필요 seq len = 10 , window = 30 -> 에러는 안나나 건너뛰는 데이터 너무 많아짐
-      #values: [1, 2, 3, 4, 5]
+      values: [0, 1, 2]
     use_res:
       values: [True, False]

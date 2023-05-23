@@ -59,6 +59,12 @@ def parse_args():
         "--use_res", default=False, type=bool,  help="Use Residual Connection"
     )
     parser.add_argument(
+        "--pos_int1", default=False, type=bool,  help="positional interaction1"
+    )
+    parser.add_argument(
+        "--pos_int2", default=False, type=bool,  help="positional interaction2"
+    )
+    parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"
     )
     parser.add_argument(
