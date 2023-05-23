@@ -47,9 +47,7 @@ def run(args,
 
     best_auc = -1
     early_stopping_counter = 0
-    losses = []
-    aucs = []
-    accs = []
+
     for epoch in range(args.n_epochs):
         logger.info("Start Training: Epoch %s", epoch + 1)
 
@@ -69,13 +67,11 @@ def run(args,
                        valid_loss_epoch=loss,
                        valid_auc_epoch=auc,
                        valid_acc_epoch=acc))
-        
-        losses.append(loss)
-        aucs.append(auc)
-        accs.append(acc)
-        
+                
         if auc > best_auc:
+            best_acc = acc
             best_auc = auc
+            best_loss = loss
             # nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
             model_to_save = model.module if hasattr(model, "module") else model
             save_checkpoint(state={"epoch": epoch + 1,
@@ -98,14 +94,10 @@ def run(args,
             scheduler.step(best_auc)
             
     if args.sweep_run:
-        val_loss_avg = sum(losses)/len(losses)
-        val_auc_avg = sum(aucs)/len(aucs)
-        val_acc_avg = sum(accs)/len(accs)
-        
         wandb.log({
-            'val_loss': val_loss_avg,
-            'val_auc': val_auc_avg,
-            'val_acc': val_acc_avg,
+            'val_loss': best_loss,
+            'val_auc': best_auc,
+            'val_acc': best_acc,
         })
         
         curr_dir = __file__[:__file__.rfind('/')+1]
@@ -113,8 +105,8 @@ def run(args,
             output = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
             
-        if output[args.model.lower()]['best_auc'] < val_auc_avg:
-            output[args.model.lower()]['best_auc'] = float(val_auc_avg)
+        if output[args.model.lower()]['best_auc'] < best_auc:
+            output[args.model.lower()]['best_auc'] = float(best_auc)
             output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             
         with open(curr_dir + '../sweep_best_auc.yaml', 'w') as file:
