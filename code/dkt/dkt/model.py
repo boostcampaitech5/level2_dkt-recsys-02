@@ -10,6 +10,9 @@ import torch.nn.init as init
 from .layer import SASRecBlock, PositionalEncoding, Feed_Forward_block
 import re
 import json
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 class GraphEmbedding:
     def __init__(self, args, model):
@@ -45,28 +48,31 @@ class ModelBase(nn.Module):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        n_dayname : int = 7,
+        n_bigclass : int = 9,
+
         **kwargs
     ):
 
         super().__init__()
         self.args = args
+        self.use_res = self.args.use_res
         self.max_seq_len = self.args.max_seq_len
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
+        self.n_dayname = n_dayname
+        self.n_bigclass = n_bigclass
         self.resize_factor = self.args.resize_factor
 
         curr_dir = __file__[:__file__.rfind('/')+1]
         with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
-        
 
-
-
-########Residual Connection
-        self.residual_connection = self.args.use_res
+        with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
+            self.len_cont =  json.load(f)
 
 ########Graph Embedding\
         self.use_graph = self.args.use_graph
@@ -84,6 +90,9 @@ class ModelBase(nn.Module):
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
         self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
+        self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
+        self.embedding_bigclass = nn.Embedding(self.num_feature['bigclass'] + 1, intd)
+        
 
 ######## FE시 추가해야함
         self.embedding_dict = {}
@@ -93,21 +102,33 @@ class ModelBase(nn.Module):
         self.embedding_dict['interaction'] = self.embedding_interaction
         self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
+        self.embedding_dict['dayname'] = self.embedding_dayname
+        self.embedding_dict['bigclass'] = self.embedding_bigclass
 
 ########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
         if self.use_graph:
             self.comb_proj = nn.Sequential(
-                nn.Linear(intd * len(self.embedding_dict) + self.graph_emb_dim , hd),
-                nn.LayerNorm(hd, eps=1e-6)
+                nn.Linear(intd * len(self.embedding_dict) + self.graph_emb_dim , hd//2),
+                nn.LayerNorm(hd//2, eps=1e-6)
             )     
         else:
             self.comb_proj = nn.Sequential(
-                nn.Linear(intd * len(self.embedding_dict) , hd),
-                nn.LayerNorm(hd, eps=1e-6)
+                nn.Linear(intd * len(self.embedding_dict) , hd//2),
+                nn.LayerNorm(hd//2, eps=1e-6)
             )
+        ##재성##
+        self.cont_proj = nn.Sequential(
+           nn.Linear(self.len_cont['n_cont'] , hd//2),
+           nn.LayerNorm(hd//2, eps=1e-6)
+        )
+        
+        #self.cont_proj = nn.Sequential(
+        #    nn.Linear(n_cont , hd),
+        #    nn.LayerNorm(hd, eps=1e-6)
+        #)
 
 ######### Fully connected layer
-        if self.residual_connection:
+        if (self.use_res == True) & (self.use_graph == True):
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
             self.fc = nn.Linear(hd, 1)
@@ -117,6 +138,7 @@ class ModelBase(nn.Module):
     def dic_embed(self, input_dic):
         
         input_dic = input_dic['category']
+        # pdb.set_trace()
         embed_list = []
         for feature, feature_seq in input_dic.items():
             if feature not in ('answerCode','mask'):
@@ -127,7 +149,11 @@ class ModelBase(nn.Module):
             embed_list.append(self.graph_emb.item_emb(input_dic['category']['assessmentItemID'].long()))
 
         embed = torch.cat(embed_list, dim = 2)
+        
+        
         return embed, batch_size
+    
+        
     
     def get_graph_emb(self, seq):
         return self.graph_emb.item_emb(seq.long())
@@ -145,11 +171,15 @@ class ModelBase(nn.Module):
 #######Category
         input_cat = input_dic['category']
         embed_list = []
+        # pdb.set_trace()
         for feature, feature_seq in input_cat.items():
             batch_size = feature_seq.size(0)
             
             if feature not in ('answerCode','mask'):
-                embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+                try:
+                    embed_list.append(self.embedding_dict[feature](feature_seq.long()))
+                except:
+                    pdb.set_trace()
 
         if self.use_graph: 
             embed_list.append(self.graph_emb.item_emb(input_cat['assessmentItemID'].long()))
@@ -158,9 +188,18 @@ class ModelBase(nn.Module):
         X = self.comb_proj(embed)
 
 #######Continous
-        #input_cont = input_dic['continous']
+        input_cont = input_dic['continous']
+        conti_list = []
+        for feature, feature_seq in input_cont.items():
+            batch_size = feature_seq.size(0)
+            conti_list.append(feature_seq.unsqueeze(dim=2))
 
-        return X, batch_size
+        conti = torch.cat(conti_list, dim = 2)
+        X_conti = self.cont_proj(conti)
+        
+        X_final = torch.cat([X,X_conti],dim =2)
+        # pdb.set_trace()
+        return X_final, batch_size #X,batch_size
 
     def short_forward(self, input_dic, length):
 
@@ -195,12 +234,16 @@ class ModelBase(nn.Module):
         embed_test = self.embedding_test(testId.long())
         embed_question = self.embedding_question(assessmentItemID.long())
         embed_tag = self.embedding_tag(KnowledgeTag.long())
+        # embed_dayname = self.embedding_dayname(dayname.long())
+        # embed_bigclass = self.embedding_bigclass(bigcalass.long())
         embed = torch.cat(
             [
                 embed_interaction,
                 embed_test,
                 embed_question,
                 embed_tag,
+                # embed_dayname,
+                # embed_bigclass,
             ],
             dim=2,
         )
@@ -217,6 +260,8 @@ class LSTM(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        # n_dayname : int = 7,
+        # n_bigclass : int = 9,
         **kwargs
     ):
         super().__init__(
@@ -225,7 +270,9 @@ class LSTM(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            n_tags,
+            # n_dayname,
+            # n_bigclass
         )
         self.args = args
 
@@ -239,8 +286,14 @@ class LSTM(ModelBase):
         #                                KnowledgeTag=KnowledgeTag,
         #                                answerCode=answerCode,
         #                                mask=mask,
-        #                                interaction=interaction)
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
+        
+        
+   
         X, batch_size = super().dic_forward(input_dic)
+        # pdb.set_trace()
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)
@@ -256,6 +309,8 @@ class LSTMATTN(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        # n_dayname : int = 7,
+        # n_bigclass : int = 9,
         n_heads: int = 2,
         drop_out: float = 0.1,
         **kwargs
@@ -266,7 +321,9 @@ class LSTMATTN(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            n_tags,
+            # n_dayname,
+            # n_bigclass
         )
         self.n_heads = n_heads
         self.drop_out = drop_out
@@ -287,10 +344,12 @@ class LSTMATTN(ModelBase):
     def forward(self, input_dic):
         #X, batch_size = super().forward(testId=testId,
         #                                assessmentItemID=assessmentItemID,
-        #                               KnowledgeTag=KnowledgeTag,
-        #                              answerCode=answerCode,
-        #                               mask=mask,
-        #                              interaction=interaction)
+        #                                KnowledgeTag=KnowledgeTag,
+        #                                answerCode=answerCode,
+        #                                mask=mask,
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
 
@@ -305,7 +364,7 @@ class LSTMATTN(ModelBase):
         encoded_layers = self.attn(out, extended_attention_mask, head_mask=head_mask)
         sequence_output = encoded_layers[-1]
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             sequence_output = torch.cat([sequence_output, graph_out], dim = 2)
             sequence_output = sequence_output.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -325,6 +384,8 @@ class BERT(ModelBase):
         n_tests: int = 1538,
         n_questions: int = 9455,
         n_tags: int = 913,
+        # n_dayname : int = 7,
+        # n_bigclass : int = 9,
         n_heads: int = 2,
         drop_out: float = 0.1,
         max_seq_len: float = 20,
@@ -336,7 +397,9 @@ class BERT(ModelBase):
             n_layers,
             n_tests,
             n_questions,
-            n_tags
+            # n_tags,
+            # n_dayname,
+            n_bigclass
         )
         self.n_heads = n_heads
         self.drop_out = drop_out
@@ -356,7 +419,9 @@ class BERT(ModelBase):
         #                                KnowledgeTag=KnowledgeTag,
         #                                answerCode=answerCode,
         #                                mask=mask,
-        #                                interaction=interaction)
+        #                                interaction=interaction,
+        #                                 dayname = dayname,
+        #                                 bigclass = bigclass,)
 
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
@@ -364,7 +429,7 @@ class BERT(ModelBase):
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
         out = encoded_layers[0]
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
         
@@ -700,7 +765,7 @@ class Saint(ModelBase):
 
         out = out.permute(1, 0, 2)
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -807,7 +872,7 @@ class LastQuery(ModelBase):
         hidden = self.init_hidden(batch_size)
         out, hidden = self.lstm(out, hidden)
         
-        if self.residual_connection:
+        if self.args.use_res:
             graph_out = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([graph_out, out], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -846,6 +911,9 @@ class TransLSTM_G(ModelBase):
         )
         self.n_heads = self.args.n_heads
         self.dropout = self.args.drop_out
+        self.max_seq_len = self.args.max_seq_len
+        self.hidden_dim = self.args.hidden_dim
+        self.n_layers = self.args.n_layers
         self.max_seq_len = self.args.max_seq_len
 
         # Bert config
@@ -1069,7 +1137,7 @@ class NoamOpt:
         out, _ = self.lstm(out)
         #out_lstm , _ = self.lstm(encoded_layers[0])
 
-        if self.residual_connection:
+        if self.args.use_res:
             graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             out = torch.cat([out, graph_emb], dim = 2)
             out = out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -1121,14 +1189,15 @@ class LongShort(ModelBase):
         self.n_tags = n_tags
 
         self.get_long_short()
-        self.graph_dim = self.short.get_graph_emb_dim()
+        if self.args.use_graph:
+            self.graph_dim = self.short.get_graph_emb_dim()
         
 
         self.long_lstm = nn.LSTM(
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
         )
         self.short_lstm = nn.LSTM(
-            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+            self.hidden_dim//4, self.hidden_dim//4 , self.n_layers, batch_first=True
         )
 
         self.long_transformer = nn.Transformer(
@@ -1140,19 +1209,19 @@ class LongShort(ModelBase):
             dropout=self.drop_out, 
             activation='relu')
         
-        self.short_transformer = nn.Transformer(
-            d_model=self.hidden_dim, 
-            nhead=self.n_heads,
-            num_encoder_layers=self.n_layers, 
-            num_decoder_layers=self.n_layers, 
-            dim_feedforward=self.hidden_dim, 
-            dropout=self.drop_out, 
-            activation='relu')
+        #self.short_transformer = nn.Transformer(
+        #    d_model=self.hidden_dim, 
+        #    nhead=self.n_heads,
+        #    num_encoder_layers=self.n_layers, 
+        #    num_decoder_layers=self.n_layers, 
+        #    dim_feedforward=self.hidden_dim, 
+        #    dropout=self.drop_out, 
+        #    activation='relu')
         
         self.long_pos_encoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
         self.long_pos_decoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
-        self.short_pos_encoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
-        self.short_pos_decoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+        #self.short_pos_encoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
+        #self.short_pos_decoder = PositionalEncoding(self.hidden_dim, self.drop_out, self.max_seq_len)
 
         self.long_enc_mask = None
         self.long_dec_mask = None
@@ -1161,19 +1230,19 @@ class LongShort(ModelBase):
         self.short_dec_mask = None
         self.short_enc_dec_mask = None
 
-        if self.residual_connection:  
-            self.fc_long = nn.Linear(self.hidden_dim + self.graph_dim, self.hidden_dim // 4)
-            self.fc_short = self.fc_long = nn.Linear(self.hidden_dim + self.graph_dim, self.hidden_dim // 4)
+        if (self.args.use_res == True) & (self.args.use_graph == True):  
+            self.fc_long = nn.Linear(self.hidden_dim + self.graph_dim, self.hidden_dim//4)
+            self.fc_short = self.fc_long = nn.Linear(self.hidden_dim//4 + self.graph_dim, self.hidden_dim//8)
         else:
-            self.fc_long = self.fc_long = nn.Linear(self.hidden_dim, self.hidden_dim // 4)
-            self.fc_short = self.fc_long = nn.Linear(self.hidden_dim, self.hidden_dim // 4)
+            self.fc_long = nn.Linear(self.hidden_dim, self.hidden_dim//4)
+            self.fc_short = nn.Linear(self.hidden_dim//4, self.hidden_dim//8)
 
-        self.fc_last = nn.Linear(self.hidden_dim // 4 + self.hidden_dim // 4 ,1)
+        self.fc_last = nn.Linear(self.hidden_dim//4 + self.hidden_dim//8, 1)
 
     def get_long_short(self):
         self.short = ModelBase(
             self.args,
-            self.hidden_dim,
+            self.hidden_dim//4,
             self.n_layers,
             self.n_tests,
             self.n_questions,
@@ -1232,8 +1301,7 @@ class LongShort(ModelBase):
         long_out_trans = long_out.permute(1, 0, 2)
 
         long_out , _ = self.long_lstm(long_out_trans)
-
-        if self.residual_connection:
+        if self.args.use_res:
             graph_emb = super().get_graph_emb(input_dic['category']['assessmentItemID'])
             long_out = torch.cat([long_out, graph_emb], dim = 2)
             long_out = long_out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
@@ -1246,44 +1314,45 @@ class LongShort(ModelBase):
 
         #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
         short_embed_enc, batch_size = self.short.short_forward(input_dic, self.short_len)
-        short_embed_dec, batch_size = self.short.short_forward(input_dic, self.short_len)
+        #short_embed_dec, batch_size = self.short.short_forward(input_dic, self.short_len)
 
-        if self.short_enc_mask is None or self.short_enc_mask.size(0) != self.max_seq_len:
-            self.short_enc_mask = self.get_mask(self.max_seq_len).to(self.device)
+        #if self.short_enc_mask is None or self.short_enc_mask.size(0) != self.max_seq_len:
+        #    self.short_enc_mask = self.get_mask(self.max_seq_len).to(self.device)
 
-        if self.short_dec_mask is None or self.short_dec_mask.size(0) != self.max_seq_len:
-            self.short_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+        #if self.short_dec_mask is None or self.short_dec_mask.size(0) != self.max_seq_len:
+        #   self.short_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
 
-        if self.short_enc_dec_mask is None or self.short_enc_dec_mask.size(0) != self.max_seq_len:
-            self.short_enc_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
+        #if self.short_enc_dec_mask is None or self.short_enc_dec_mask.size(0) != self.max_seq_len:
+        #   self.short_enc_dec_mask = self.get_mask(self.max_seq_len).to(self.device)
 
-        short_embed_enc = short_embed_enc.permute(1, 0, 2)
-        short_embed_dec = short_embed_dec.permute(1, 0, 2)
+        #short_embed_enc = short_embed_enc.permute(1, 0, 2)
+        #short_embed_dec = short_embed_dec.permute(1, 0, 2)
         
         # Positional encoding
 
-        short_embed_enc = self.short_pos_encoder(short_embed_enc)
-        short_embed_dec = self.short_pos_decoder(short_embed_dec)
+        #short_embed_enc = self.short_pos_encoder(short_embed_enc)
+        #short_embed_dec = self.short_pos_decoder(short_embed_dec)
         
-        short_out = self.short_transformer(short_embed_enc, short_embed_dec,
-                               src_mask=self.short_enc_mask,
-                               tgt_mask=self.short_dec_mask,
-                               memory_mask=self.short_enc_dec_mask)
+        #short_out = self.short_transformer(short_embed_enc, short_embed_dec,
+        #                       src_mask=self.short_enc_mask,
+        #                       tgt_mask=self.short_dec_mask,
+        #                       memory_mask=self.short_enc_dec_mask)
         
-        short_out_trans = short_out.permute(1, 0, 2)
+        #short_out_trans = short_out.permute(1, 0, 2)
 
-        short_out , _ = self.short_lstm(short_out_trans)
+        #short_out , _ = self.short_lstm(short_out_trans)
+        short_out , _ = self.short_lstm(short_embed_enc)
         #out_lstm , _ = self.lstm(encoded_layers[0])
 
 
-        if self.residual_connection:
+        if self.args.use_res:
             short_seq = input_dic['category']['assessmentItemID'][:, -self.max_seq_len:]
             padded_seq = self.short.pad(short_seq)
             graph_emb = self.short.get_graph_emb(padded_seq )
             short_out = torch.cat([short_out, graph_emb], dim = 2)
-            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim + self.graph_emb_dim)
+            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim//4 + self.graph_emb_dim)
         else:
-            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim)
+            short_out = short_out.contiguous().view(batch_size, -1, self.hidden_dim//4)
 
         short_out = self.fc_short(short_out)
 
