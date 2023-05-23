@@ -1064,29 +1064,52 @@ class SAKT(ModelBase):
         self.args = args
         self.n_heads = args.n_heads
         self.max_seq_len = self.args.max_seq_len
-        self.intd = args.hidden_dim // self.n_heads
         self.drop_out = args.drop_out
         self.hidden_dim = args.hidden_dim
 
-        self.embd_pos = nn.Embedding(self.max_seq_len, embedding_dim = self.hidden_dim)
+        
 
-        self.linear = nn.ModuleList( [nn.Linear(in_features= self.intd , out_features= self.intd ) for x in range(3)] )   # Linear projection for each embedding 
-        self.attn = nn.MultiheadAttention(embed_dim= self.intd , num_heads= self.n_heads, dropout= self.drop_out )                                   
+        self.linear = nn.ModuleList( [nn.Linear(in_features= self.hidden_dim , out_features= self.hidden_dim ) for x in range(3)] )   # Linear projection for each embedding 
+        self.attn = nn.MultiheadAttention(embed_dim= self.hidden_dim , num_heads= self.n_heads, dropout= self.drop_out )                                   
         self.ffn = nn.ModuleList([nn.Linear(in_features= self.hidden_dim  , out_features=self.hidden_dim , bias= True) for x in range(2)])  # feed forward layers post attention
 
-        self.linear_out = nn.Linear(in_features= self.intd  , out_features= 1 , bias=True) 
-        self.layer_norm1 = nn.LayerNorm( self.intd )
-        self.layer_norm2 = nn.LayerNorm( self.intd )                           # output with correctnness prediction 
+        self.linear_out = nn.Linear(in_features= self.hidden_dim  , out_features= 1 , bias=True) 
+        self.layer_norm1 = nn.LayerNorm( self.hidden_dim )
+        self.layer_norm2 = nn.LayerNorm( self.hidden_dim )                           # output with correctnness prediction 
         self.drop = nn.Dropout(self.drop_out)
 
+
+        self.embedding_pos = nn.Embedding(self.max_seq_len, self.hidden_dim)
+
+        self.interaction_dic = {}
+        for i in range(n_questions+1):
+            self.interaction_dic[i] = nn.Embedding(3, self.hidden_dim)
+        
     def get_mask(self, seq_len):
-        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
+        mask = torch.from_numpy( np.triu(np.ones((seq_len ,seq_len)), k=1).astype('bool')) 
         return mask
+    
+    def get_interaction(self, item_seqs, interactions):
+
+        batch_size = item_seqs.size(0)
+        emb_list = []
+        for item_seq, interaction in zip(item_seqs, interactions):
+            tmp = []
+            for id, it in zip(item_seq, interaction):
+                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+            emb_list.append(torch.cat(tmp, dim = 1))
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+   
+        pos_emb = self.embedding_pos(pos.cuda())
+        interaction_emb = torch.cat(emb_list, dim = 0).cuda()
+       
+        return interaction_emb + pos_emb
     
     def forward(self ,input_dic):
 
 
-        interaction_emb = super().get_interaction2(input_dic['category']['assessmentItemID'], 
+        interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
                                                         input_dic['category']['interaction'])
 
         ## split the interaction embeding into v and k ( needs to verify if it is slpited or not)
@@ -1096,26 +1119,128 @@ class SAKT(ModelBase):
         ## get the excercise embedding output
         
         item_emb, batch_size = super().dic_forward(input_dic)                       # (b,n) --> (b,n,d) #print(query_ex.shape)
-      
+
         ## Linearly project all the embedings
-        value_in = self.linear[0](value_in).permute(1,0,2)        # (b,n,d) --> (n,b,d)
-        key_in = self.linear[1](key_in).permute(1,0,2)
-        query_ex =  self.linear[2](item_emb).permute(1,0,2)
+        value_in = self.linear[0](value_in).permute(1,0,2).cuda()       # (b,n,d) --> (n,b,d)
+        key_in = self.linear[1](key_in).permute(1,0,2).cuda()
+        query_ex =  self.linear[2](item_emb).permute(1,0,2).cuda()
 
         ## pass through multihead attention
-        att_mask = self.get_mask(self.max_seq_len)
-        atn_out , _ = self.attn(query_ex , key_in, value_in , attn_mask= att_mask, k=1).astype('bool')     # lower triangular mask, bool, torch    (n,b,d)
+        att_mask = self.get_mask(self.max_seq_len).cuda()
+        atn_out , _ = self.attn(query_ex , key_in, value_in , attn_mask= att_mask)     # lower triangular mask, bool, torch    (n,b,d)
         atn_out = query_ex + atn_out                                  # Residual connection ; added excercise embd as residual because previous ex may have imp info, suggested in paper.
         atn_out = self.layer_norm1( atn_out )                          # Layer norm                        #print('atn',atn_out.shape) #n,b,d = atn_out.shape
 
         #take batch on first axis 
         atn_out = atn_out.permute(1,0,2)                              #  (n,b,d) --> (b,n,d)
+        atn_out = atn_out.contiguous().view(batch_size, -1, self.hidden_dim)
+        ## FFN 
+        return self.fc(atn_out).view(batch_size, -1)
+
+
+class SAKTLSTM(ModelBase):  
+    def __init__(
+        self,
+        args,
+        hidden_dim: int = 64,
+        n_layers: int = 2,
+        n_tests: int = 1538,
+        n_questions: int = 9455,
+        n_tags: int = 913,
+        n_heads: int = 2,
+        drop_out: float = 0.1,
+        max_seq_len: float = 20,
+        **kwargs
+    ):
+        super().__init__(
+            args,
+            hidden_dim,
+            n_layers,
+            n_tests,
+            n_questions,
+            n_tags
+        )
+        self.args = args
+        self.n_heads = args.n_heads
+        self.max_seq_len = self.args.max_seq_len
+        self.drop_out = args.drop_out
+        self.hidden_dim = args.hidden_dim
+
         
-        ## FFN 2 layers
-        ffn_out = self.drop(self.ffn[1]( nn.ReLU()( self.ffn[0]( atn_out ) )))   # (n,b,d) -->    .view([n*b ,d]) is not needed according to the kaggle implementation
-        ffn_out = self.layer_norm2( ffn_out + atn_out )                # Layer norm and Residual connection
 
-        ## sigmoid
-        ffn_out = self.linear_out( ffn_out )
+        self.linear = nn.ModuleList( [nn.Linear(in_features= self.hidden_dim , out_features= self.hidden_dim ) for x in range(3)] )   # Linear projection for each embedding 
+        self.attn = nn.MultiheadAttention(embed_dim= self.hidden_dim , num_heads= self.n_heads, dropout= self.drop_out )                                   
+        self.ffn = nn.ModuleList([nn.Linear(in_features= self.hidden_dim  , out_features=self.hidden_dim , bias= True) for x in range(2)])  # feed forward layers post attention
 
-        return ffn_out
+        self.linear_out = nn.Linear(in_features= self.hidden_dim  , out_features= 1 , bias=True) 
+        self.layer_norm1 = nn.LayerNorm( self.hidden_dim )
+        self.layer_norm2 = nn.LayerNorm( self.hidden_dim )                           # output with correctnness prediction 
+        self.drop = nn.Dropout(self.drop_out)
+
+        self.lstm = nn.LSTM(
+            self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
+        )
+
+        self.embedding_pos = nn.Embedding(self.max_seq_len, self.hidden_dim)
+
+        self.interaction_dic = {}
+        for i in range(n_questions+1):
+            self.interaction_dic[i] = nn.Embedding(3, self.hidden_dim)
+        
+        if self.use_res:
+            self.fc = nn.Linear(self.hidden_dim + self.hidden_dim, 1)
+        else:
+            self.fc = nn.Linear(self.hidden_dim, 1)
+
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy( np.triu(np.ones((seq_len ,seq_len)), k=1).astype('bool')) 
+        return mask
+    
+    def get_interaction(self, item_seqs, interactions):
+
+        batch_size = item_seqs.size(0)
+        emb_list = []
+        for item_seq, interaction in zip(item_seqs, interactions):
+            tmp = []
+            for id, it in zip(item_seq, interaction):
+                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+            emb_list.append(torch.cat(tmp, dim = 1))
+        pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
+   
+        pos_emb = self.embedding_pos(pos.cuda())
+        interaction_emb = torch.cat(emb_list, dim = 0).cuda()
+       
+        return interaction_emb + pos_emb
+    
+    def forward(self ,input_dic):
+
+
+        interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
+                                                        input_dic['category']['interaction'])
+
+        ## split the interaction embeding into v and k ( needs to verify if it is slpited or not)
+        value_in = interaction_emb
+        key_in   = interaction_emb                                        #print('v,k ', value_in.shape)
+        
+        ## get the excercise embedding output
+        
+        item_emb, batch_size = super().dic_forward(input_dic)                       # (b,n) --> (b,n,d) #print(query_ex.shape)
+
+        ## Linearly project all the embedings
+        value_in = self.linear[0](value_in).permute(1,0,2).cuda()       # (b,n,d) --> (n,b,d)
+        key_in = self.linear[1](key_in).permute(1,0,2).cuda()
+        query_ex =  self.linear[2](item_emb).permute(1,0,2).cuda()
+
+        ## pass through multihead attention
+        att_mask = self.get_mask(self.max_seq_len).cuda()
+        atn_out , _ = self.attn(query_ex , key_in, value_in , attn_mask= att_mask)     # lower triangular mask, bool, torch    (n,b,d)
+        atn_out = query_ex + atn_out                                  # Residual connection ; added excercise embd as residual because previous ex may have imp info, suggested in paper.
+        atn_out = self.layer_norm1( atn_out )                          # Layer norm                        #print('atn',atn_out.shape) #n,b,d = atn_out.shape
+
+        #take batch on first axis 
+        atn_out = atn_out.permute(1,0,2)                              #  (n,b,d) --> (b,n,d)
+        out, _ = self.lstm(atn_out)
+        if self.use_res: out = torch.cat([out, atn_out], dim = 2).contiguous().view(batch_size, -1, self.hidden_dim*2)
+        else: out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        return self.fc(out).view(batch_size, -1)
