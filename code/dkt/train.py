@@ -59,7 +59,7 @@ def graph_name_parser(args):
 
 def sweep_main(args):
     
-    wandb.init()
+    wandb.init(entity='recommy')
     config2args(args)
     wandb.run.name = graph_name_parser(args)
 

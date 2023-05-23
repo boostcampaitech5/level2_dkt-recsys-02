@@ -35,7 +35,7 @@ def parse_args():
         "--max_seq_len", default=20, type=int, help="max sequence length"
     )
     parser.add_argument(
-        "--data_augmentation", default=False, type=bool, help="Apply sliding window"
+        "--data_augmentation", default=True, type=bool, help="Apply sliding window"
     )
     parser.add_argument(
         "--window", default=10, type=int, help="Size of sliding window"
@@ -101,7 +101,7 @@ def parse_args():
     
     ### wandb ###
     parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
-    parser.add_argument("--tuning_count", default=5, type=int, help="tuning count")
+    parser.add_argument("--tuning_count", default=50, type=int, help="tuning count")
 
     args = parser.parse_args()
 
