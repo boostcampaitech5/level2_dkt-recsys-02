@@ -79,7 +79,7 @@ def sweep_main(args):
     
     train_data, valid_data = preprocess.split_data_df(data=train_data)    
     
-    if args.model == 'tabnet' or 'catboost':
+    if args.model == 'tabnet' or args.model == 'catboost':
         preprocess.load_test_data(file_name=args.test_file_name)
         test_data = preprocess.get_test_data()
         
