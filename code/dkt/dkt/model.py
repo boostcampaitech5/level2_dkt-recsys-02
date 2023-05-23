@@ -50,6 +50,7 @@ class ModelBase(nn.Module):
         n_tags: int = 913,
         n_dayname : int = 7,
         n_bigclass : int = 9,
+        n_cont : int = 18,
 
         **kwargs
     ):
@@ -65,14 +66,15 @@ class ModelBase(nn.Module):
         self.n_tags = n_tags
         self.n_dayname = n_dayname
         self.n_bigclass = n_bigclass
+        self.n_cont = n_cont
         self.resize_factor = self.args.resize_factor
 
         curr_dir = __file__[:__file__.rfind('/')+1]
         with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
             self.num_feature =  json.load(f)
 
-        with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
-            self.len_cont =  json.load(f)
+        # with open(curr_dir + f'../models_param/len_cont.json', 'r') as f:
+        #     self.len_cont =  json.load(f)
 
 ########Graph Embedding\
         self.use_graph = self.args.use_graph
@@ -118,7 +120,7 @@ class ModelBase(nn.Module):
             )
         ##재성##
         self.cont_proj = nn.Sequential(
-           nn.Linear(self.len_cont['n_cont'] , hd//2),
+           nn.Linear(self.n_cont , hd//2),
            nn.LayerNorm(hd//2, eps=1e-6)
         )
         
