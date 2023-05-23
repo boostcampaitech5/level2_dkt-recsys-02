@@ -780,7 +780,72 @@ class TransLSTM_G(ModelBase):
         # Bert config
         self.graph_dim = super().get_graph_emb_dim()
         self.device = self.args.device
+######################## FE시 추가해야함
+    def forward(self, input_dic):
+        #X, batch_size = super().forward(testId=testId,
+        #                                assessmentItemID=assessmentItemID,
+        #                                KnowledgeTag=KnowledgeTag,
+        #                                answerCode=answerCode,
+        #                                mask=mask,
+        #                                interaction=interaction)
 
+        X, batch_size = super().dic_forward(input_dic)
+
+
+        mask = input_dic['mask']
+
+        #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
+        embed_enc, batch_size = super().dic_embed(input_dic)
+        embed_dec, batch_size = super().dic_embed(input_dic)
+
+        seq_len = input_dic['interaction'].size(1)
+
+        # ATTENTION MASK 생성
+        # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
+        # 사실 이렇게 3개로 나눌 필요가 없다
+        if self.enc_mask is None or self.enc_mask.size(0) != seq_len:
+            self.enc_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.dec_mask is None or self.dec_mask.size(0) != seq_len:
+            self.dec_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.enc_dec_mask is None or self.enc_dec_mask.size(0) != seq_len:
+            self.enc_dec_mask = self.get_mask(seq_len).to(self.device)
+
+
+        embed_enc = embed_enc.permute(1, 0, 2)
+        embed_dec = embed_dec.permute(1, 0, 2)
+
+        # Positional encoding
+        embed_enc = self.pos_encoder(embed_enc)
+        embed_dec = self.pos_decoder(embed_dec)
+
+        out = self.transformer(embed_enc, embed_dec,
+                               src_mask=self.enc_mask,
+                               tgt_mask=self.dec_mask,
+                               memory_mask=self.enc_dec_mask)
+        out_trans = out.permute(1, 0, 2)
+
+
+        #encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
+        #out_trans = encoded_layers[0]
+
+        out_lstm , _ = self.lstm(out_trans)
+        #out_lstm , _ = self.lstm(encoded_layers[0])
+
+        out = torch.cat([out_trans, out_lstm], dim = 2)
+
+        if self.residual_connection:
+            graph_emb = super().get_graph_emb(input_dic['assessmentItemID'])
+            out = torch.cat([out, graph_emb], dim = 2)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2 + self.graph_emb_dim)
+        else:
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2)
+
+
+        out = self.fc(out).view(batch_size, -1)
+        return out
+    
 #####################saint plus
 """
 Reference:
