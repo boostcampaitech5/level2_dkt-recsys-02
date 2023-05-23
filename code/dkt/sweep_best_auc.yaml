@@ -21,10 +21,10 @@ lightgcn:
   best_auc: -1
   parameter: null
 lstm:
-  best_auc: 0.7642891494017957
+  best_auc: 0.7676041607283293
   parameter:
     batch_size: 512.0
-    drop_out: 0.2727314073029609
+    drop_out: 0.1680371865141252
     hidden_dim: 512.0
     lr: 0.001
     max_seq_len: 25.0
