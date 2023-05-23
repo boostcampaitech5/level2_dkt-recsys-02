@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import wandb
 import pdb
-from dkt import trainer, trainer_custom
+from dkt import trainer#, trainer_custom
 from dkt.args import parse_args
 from dkt.dataloader import Preprocess
 from dkt.utils import get_logger, set_seeds, logging_conf
@@ -52,7 +52,7 @@ def config2args(args):
     temp = vars(args)
     for key, value in dict(wandb.config).items():
         temp[key] = value
-       
+    # pdb.set_trace()
     return args
 
 def graph_name_parser(args):
@@ -66,7 +66,7 @@ def graph_name_parser(args):
 def sweep_main(args):
     
     wandb.init(entity='recommy')
-    config2args(args)
+    args = config2args(args)
     wandb.run.name = graph_name_parser(args)
 
     set_seeds(args.seed)
