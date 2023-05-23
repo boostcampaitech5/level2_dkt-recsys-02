@@ -62,8 +62,7 @@ translstm_g:
     n_layers:
       values: [1, 2, 3, 4, 5]
     n_heads:
-      min: 1
-      max: 5
+      values: [2, 4, 8]
     graph_dim:
       values: [64, 128, 256]
     drop_out:
@@ -76,8 +75,6 @@ translstm_g:
       max: 200
     hidden_dim:
       values: [16, 32, 64, 128, 256, 512]
-    shuffle_n:
-      values: [0, 1, 2, 3]
     window: #seq_len에 adaptive하게 조정이 필요 seq len = 10 , window = 30 -> 에러는 안나나 건너뛰는 데이터 너무 많아짐
       min: 1
       max: 50
