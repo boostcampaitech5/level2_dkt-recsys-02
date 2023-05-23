@@ -782,10 +782,7 @@ class TransLSTM_G(ModelBase):
         self.device = self.args.device
 
 #####################saint plus
-"""
-Reference:
-https://arxiv.org/abs/2002.07033
-"""
+
 
 class FFN(nn.Module):
     def __init__(self, d_ffn, d_model, dropout):
