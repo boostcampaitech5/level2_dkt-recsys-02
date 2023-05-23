@@ -10,6 +10,7 @@ from dkt.dataloader import Preprocess
 from dkt.utils import get_logger, set_seeds, logging_conf
 from functools import partial
 import yaml
+import random
 
 logger = get_logger(logging_conf)
 
@@ -44,9 +45,15 @@ def main(args):
 
 
 def config2args(args):
+    len_weight = [0.1, 0.2, 0.3, 0.4, 0.5]
+    if 'max_seq_len' in wandb.config:
+        wandb.config.update({'window': int(random.choice(len_weight) * wandb.config['max_seq_len'])})
+
     temp = vars(args)
     for key, value in dict(wandb.config).items():
         temp[key] = value
+       
+    pdb.set_trace()
     return args
 
 def graph_name_parser(args):
