@@ -7,8 +7,7 @@ lgbm:
     goal: maximize
   parameters:
     learning_rate:
-      min: 0.0005
-      max: 0.5
+      values: [0.005, 0.001, 0.01, 0.1]
     num_leaves:
       values: [10, 20, 31, 40, 50]
     feature_fraction:
