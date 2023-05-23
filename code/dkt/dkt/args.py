@@ -3,7 +3,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
+    
     parser.add_argument("--seed", default=42, type=int, help="seed")
     parser.add_argument("--device", default="cpu", type=str, help="cpu or gpu")
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args():
         "--max_seq_len", default=20, type=int, help="max sequence length"
     )
     parser.add_argument(
-        "--data_augmentation", default=False, type=bool, help="Apply sliding window"
+        "--data_augmentation", default=True, type=bool, help="Apply sliding window"
     )
     parser.add_argument(
         "--window", default=10, type=int, help="Size of sliding window"
@@ -74,6 +74,8 @@ def parse_args():
         "--past_present", default=False, type=bool, help="use past and present at the same time"
     )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
+    
+    parser.add_argument('--n_cont', type=int, help='The number of continuous features')
 
     # 모델
     parser.add_argument(
@@ -107,7 +109,11 @@ def parse_args():
     
     ### wandb ###
     parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
-    parser.add_argument("--tuning_count", default=5, type=int, help="tuning count")
+    parser.add_argument("--tuning_count", default=50, type=int, help="tuning count")
+
+    ### TabNet ###
+    parser.add_argument("--cat_emb_dim", default=1, type=int, help="categorical embedding dimensions")
+    parser.add_argument("--weights", default=False, type=bool, help="custom weights per class, 1 for auto")
 
     args = parser.parse_args()
 

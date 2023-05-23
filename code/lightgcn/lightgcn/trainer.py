@@ -53,9 +53,6 @@ def run(
     logger.info(f"Training Started : n_epochs={n_epochs}")
     best_auc, best_epoch = 0, -1
 
-    aucs = []
-    accs = []
-
     for e in range(n_epochs):
         logger.info("Epoch: %s", e)
         # TRAIN
@@ -69,12 +66,10 @@ def run(
                        valid_acc_epoch=acc,
                        valid_auc_epoch=auc))
 
-        aucs.append(auc)
-        accs.append(acc)
-
         if auc > best_auc:
             logger.info("Best model updated AUC from %.4f to %.4f", best_auc, auc)
             best_auc, best_epoch = auc, e
+            best_acc = acc
             torch.save(obj= {"model": model.state_dict(), "epoch": e + 1},
                        f=os.path.join(model_dir, f"lgcn_best_model.pt"))
     torch.save(obj={"model": model.state_dict(), "epoch": e + 1},
@@ -82,12 +77,9 @@ def run(
     logger.info(f"Best Weight Confirmed : {best_epoch+1}'th epoch")
 
     if args.sweep_run:
-        val_auc_avg = sum(aucs)/len(aucs)
-        val_acc_avg = sum(accs)/len(accs)
-        
         wandb.log({
-            'val_auc': val_auc_avg,
-            'val_acc': val_acc_avg,
+            'val_auc': best_auc,
+            'val_acc': best_acc,
         })
         
         curr_dir = __file__[:__file__.rfind('/')+1]
@@ -95,8 +87,8 @@ def run(
             output = yaml.load(file, Loader=yaml.FullLoader)
         file.close()
             
-        if output[args.model.lower()]['best_auc'] < val_auc_avg:
-            output[args.model.lower()]['best_auc'] = float(val_auc_avg)
+        if output[args.model.lower()]['best_auc'] < best_auc:
+            output[args.model.lower()]['best_auc'] = float(best_auc)
             output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             
         with open(curr_dir + '../sweep_best_auc.yaml', 'w') as file:

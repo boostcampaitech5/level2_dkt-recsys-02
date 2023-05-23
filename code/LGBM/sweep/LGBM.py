@@ -159,7 +159,6 @@ def main(args):
         file.close()
             
         if output[args.model.lower()]['best_auc'] < kfold_auc:
-            pdb.set_trace()
             output[args.model.lower()]['best_auc'] = float(kfold_auc)
             output[args.model.lower()]['parameter'] = dict(zip(dict(wandb.config).keys(),map(lambda x: x if type(x) == str else float(x) , dict(wandb.config).values())))
             

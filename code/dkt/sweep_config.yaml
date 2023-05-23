@@ -4,17 +4,23 @@ lstm:
     name: val_auc
     goal: maximize
   parameters: # 변경하고 싶은 parameters
-    lr:
-      # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
-      # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
-      values: [1e-2, 1e-3, 1e-4]
+    # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
+    # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
     n_epochs:
-      min: 1
-      max: 3
+      value: 100
     drop_out:
-      # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
+    # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
       min: 0.0
       max: 0.5
+    hidden_dim:
+      values: [16, 32, 64, 128, 256, 512]
+    batch_size:
+      values: [64, 128, 256, 512]
+    lr:
+      values: [1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
+    max_seq_len:
+      min: 5
+      max: 50
 
 
 bert:
@@ -25,12 +31,20 @@ bert:
   parameters:
     lr:
       values: [1e-2, 1e-3, 1e-4]
-    n_epochs:
-      min: 1
-      max: 3
+    n_epochs:      
+      value: 100
     drop_out:
       min: 0.0
       max: 0.5
+    hidden_dim:
+      values : [16,32,64,128,256,512]
+    n_layers:
+      min: 1 
+      max: 10
+    n_heads:
+      values: [1,2,4,8]
+    batch_size:
+      values: [64,128,256,512]
 
 
 lastquery:
@@ -162,4 +176,31 @@ saktlstm:
     shuffle_n:
       values: [0, 1, 2]
     use_res:
+      values: [True, False]
+
+
+tabnet:
+  method: bayes # 매개변수를 찾는 방식
+  metric: # 어떤 메트릭을 기준으로 좋은 실험을 찾을지
+    name: val_auc
+    goal: maximize
+  parameters: # 변경하고 싶은 parameters
+    lr:
+      # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
+      # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
+      values: [1e-2, 1e-3, 1e-4]
+    batch_size:
+      values: [256, 512, 1024, 2048, 4096, 8192, 16384]
+    hidden_dim:
+      values: [8, 16, 32, 64, 128]
+    cat_emb_dim:
+      min: 1
+      max: 10
+    seed:
+      min: 0
+      max: 42
+    clip_grad:
+      min: 1
+      max: 10
+    weights:
       values: [True, False]
