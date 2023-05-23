@@ -21,12 +21,16 @@ class Preprocess:
         self.train_data = None
         self.test_data = None
         self.kf = args.kfold
+        self.cat_dims = {}
 
     def get_train_data(self):
         return self.train_data
 
     def get_test_data(self):
         return self.test_data
+
+    def get_cat_dims(self):
+        return self.cat_dims
 
     def split_data(self,
                    data: np.ndarray,
@@ -112,6 +116,8 @@ class Preprocess:
             label_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
             feature_maping_info[col] = label_mapping
 
+            self.cat_dims[col] = len(le.classes_)
+            
             df[col] = test
         
 ######### FE 시에  연속형 변수 추가 시 추가 부탁
