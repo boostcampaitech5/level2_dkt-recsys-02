@@ -102,7 +102,7 @@ def run(
 
 def run_kfold(
     args,
-    folds: list,
+    train_data: dict,
     n_node: int,
     device: str,
     n_epochs: int = 100,
@@ -112,7 +112,7 @@ def run_kfold(
     
     folds_weights = []
 
-    for dic in folds:
+    for i in range(args.n_folds):
         model = build(
             n_node=n_node,
             embedding_dim=args.hidden_dim,
@@ -121,11 +121,12 @@ def run_kfold(
         )
 
         model = model.to(device)
-        train_data = dic['train']
-        valid_data = dic['valid']
-        pdb.set_trace()
-        edge, label = valid_data["edge"], valid_data["label"].to("cpu").detach().numpy()
-        valid_data = dict(edge, label)
+        if valid_data is None:
+            eids = np.arange(len(train_data["label"]))
+            eids = np.random.permutation(eids)[1000*i:1000*(i+1)]
+            edge, label = train_data["edge"], train_data["label"]
+            label = label.to("cpu").detach().numpy()
+            valid_data = dict(edge=edge[:, eids], label=label[eids])
 
         model.train()
 

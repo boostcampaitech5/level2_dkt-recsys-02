@@ -26,12 +26,12 @@ def main(args: argparse.Namespace):
 
     logger.info("Preparing data ...")
     if args.kfold:
-        folds, id2index = prepare_dataset_kfold(args, device=device, data_dir=args.data_dir)
+        train_data, test_data, id2index  = prepare_dataset(device=device, data_dir=args.data_dir)
         n_node = len(id2index)
 
         graph_emb = trainer.run_kfold(
         args = args,
-        folds = folds,
+        train_data = train_data,
         n_node = n_node,
         device = device,
         n_epochs=args.n_epochs,
