@@ -67,7 +67,15 @@ def run(args,
                        valid_loss_epoch=loss,
                        valid_auc_epoch=auc,
                        valid_acc_epoch=acc))
-                
+        
+
+        if auc < 0.51 : 
+            logger.info(
+                    "Too Low AUC",
+                    early_stopping_counter, args.patience
+                )
+            break
+
         if auc > best_auc:
             best_acc = acc
             best_auc = auc
