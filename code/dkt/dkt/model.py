@@ -30,13 +30,15 @@ class GraphEmbedding:
             for i, label in enumerate(item_label):
                 if i == 0:
                     self.hidden_dim = len(item_emb_dic[label])
-                    item_emb.append(item_emb_dic[label])
-                item_emb.append(item_emb_dic[label])
+                    item_emb.append(np.expand_dims(item_emb_dic[label], 0))
+                item_emb.append(np.expand_dims(item_emb_dic[label], 0))
+            item_emb = np.concatenate(item_emb, axis=0)
             item_emb = torch.tensor(item_emb).to(self.args.device)
             self.item_emb = nn.Embedding.from_pretrained(item_emb)
 
     def item_emb(self, item_seq): return self.item_emb(item_seq)
     def user_emb(self, user_seq): return self.user_emb(user_seq)
+
     
 
 class ModelBase(nn.Module):
@@ -72,15 +74,14 @@ class ModelBase(nn.Module):
         self.positional_interaction1 = self.args.pos_int1
         self.positional_interaction2 = self.args.pos_int2
 
-
-        curr_dir = __file__[:__file__.rfind('/')+1]
-        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f: self.num_feature =  json.load(f)
-
         self.use_graph = self.args.use_graph
         if self.use_graph:
             self.graph_emb = GraphEmbedding(args, self.args.graph_model)
             self.graph_emb_dim = self.args.graph_dim
 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
+            self.num_feature =  json.load(f)
 ######### Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
         if args.model.lower() =='sakt':
@@ -158,8 +159,7 @@ class ModelBase(nn.Module):
         emb_list = []
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
-            for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+            for id, it in zip(item_seq, interaction): 
                 tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
@@ -422,14 +422,7 @@ class BERT(ModelBase):
         self.encoder = BertModel(self.config)
     ######################## FE시 추가해야함
     def forward(self, input_dic):
-        #X, batch_size = super().forward(testId=testId,
-        #                                assessmentItemID=assessmentItemID,
-        #                                KnowledgeTag=KnowledgeTag,
-        #                                answerCode=answerCode,
-        #                                mask=mask,
-        #                                interaction=interaction,
-        #                                 dayname = dayname,
-        #                                 bigclass = bigclass,)
+
 
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
@@ -782,6 +775,62 @@ class TransLSTM_G(ModelBase):
         self.device = self.args.device
 
 #####################saint plus
+    def forward(self, input_dic):
+
+        mask = input_dic['category']['mask']
+
+        #enc_input = {key: input_dic[key] for key in ['testId', 'assessmentItemID', 'KnowledgeTag']}
+        embed_enc, batch_size = super().dic_embed(input_dic)
+        embed_dec, batch_size = super().dic_embed(input_dic)
+
+        seq_len = input_dic['category']['interaction'].size(1)
+
+        # ATTENTION MASK 생성
+        # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
+        # 사실 이렇게 3개로 나눌 필요가 없다
+        if self.enc_mask is None or self.enc_mask.size(0) != seq_len:
+            self.enc_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.dec_mask is None or self.dec_mask.size(0) != seq_len:
+            self.dec_mask = self.get_mask(seq_len).to(self.device)
+
+        if self.enc_dec_mask is None or self.enc_dec_mask.size(0) != seq_len:
+            self.enc_dec_mask = self.get_mask(seq_len).to(self.device)
+
+
+        embed_enc = embed_enc.permute(1, 0, 2)
+        embed_dec = embed_dec.permute(1, 0, 2)
+
+        # Positional encoding
+        embed_enc = self.pos_encoder(embed_enc)
+        embed_dec = self.pos_decoder(embed_dec)
+
+        out = self.transformer(embed_enc, embed_dec,
+                               src_mask=self.enc_mask,
+                               tgt_mask=self.dec_mask,
+                               memory_mask=self.enc_dec_mask)
+        out_trans = out.permute(1, 0, 2)
+
+
+        #encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
+        #out_trans = encoded_layers[0]
+
+        out_lstm , _ = self.lstm(out_trans)
+        #out_lstm , _ = self.lstm(encoded_layers[0])
+
+        out = torch.cat([out_trans, out_lstm], dim = 2)
+
+        if self.residual_connection:
+            graph_emb = super().get_graph_emb(input_dic['assessmentItemID'])
+            out = torch.cat([out, graph_emb], dim = 2)
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2 + self.graph_emb_dim)
+        else:
+            out = out.contiguous().view(batch_size, -1, self.hidden_dim*2)
+
+        out = self.fc(out).view(batch_size, -1)
+
+        return out
+
 
 
 class FFN(nn.Module):
@@ -1273,7 +1322,6 @@ class SAKT(ModelBase):
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
             for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
                 tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
@@ -1380,8 +1428,8 @@ class SAKTLSTM(ModelBase):
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
             for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
-                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+                x = self.interaction_dic[int(id)](it.clone().detach().cpu()).unsqueeze(dim=0).unsqueeze(dim=0)
+                tmp.append(x)
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
    

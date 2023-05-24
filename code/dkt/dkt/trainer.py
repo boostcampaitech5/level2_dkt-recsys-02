@@ -1,6 +1,6 @@
 import math
 import os
-
+from tqdm import tqdm
 import numpy as np
 import torch
 from torch import nn
@@ -166,7 +166,7 @@ def run_kfold(args,
                 #                #########모델 이름_best_model.pt로 저장하기
                 #                model_filename=f"{args.model.lower()}_best_model_fold{k+1}.pt")
                 early_stopping_counter = 0
-                fold_weights.append(model.state_dict())
+                best_model = model.state_dict()
             else:
                 early_stopping_counter += 1
                 if early_stopping_counter >= args.patience:
@@ -179,6 +179,7 @@ def run_kfold(args,
             # scheduler
             if args.scheduler == "plateau":
                 scheduler.step(best_auc)
+        fold_weights.append(best_model)
 
     average_weights = {}
     for key in fold_weights[0].keys():
@@ -251,7 +252,7 @@ def validate(valid_loader: nn.Module, model: nn.Module, args):
     total_targets = []
     losses = []
     with torch.no_grad():
-        for step, batch in enumerate(valid_loader):
+        for batch in tqdm(valid_loader):
 
             for key in batch:
                 tmp = {k: v.to(args.device) for k, v in batch[key].items()}
