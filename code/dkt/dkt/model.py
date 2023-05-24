@@ -1428,7 +1428,7 @@ class SAKTLSTM(ModelBase):
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
             for id, it in zip(item_seq, interaction):
-                x = self.interaction_dic[int(id)](it.clone().detach().cpu()).unsqueeze(dim=0).unsqueeze(dim=0)
+                x = self.interaction_dic[int(id)](it.clone().detach().cpu().long()).unsqueeze(dim=0).unsqueeze(dim=0)
                 tmp.append(x)
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)

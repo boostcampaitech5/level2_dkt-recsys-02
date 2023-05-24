@@ -29,6 +29,7 @@ def build(n_node: int, weight: str = None, **kwargs):
 
 
 def run(
+    args,
     model: nn.Module,
     train_data: dict,
     valid_data: dict = None,
@@ -121,12 +122,11 @@ def run_kfold(
         )
 
         model = model.to(device)
-        if valid_data is None:
-            eids = np.arange(len(train_data["label"]))
-            eids = np.random.permutation(eids)[1000*i:1000*(i+1)]
-            edge, label = train_data["edge"], train_data["label"]
-            label = label.to("cpu").detach().numpy()
-            valid_data = dict(edge=edge[:, eids], label=label[eids])
+        eids = np.arange(len(train_data["label"]))
+        eids = np.random.permutation(eids)[1000*i:1000*(i+1)]
+        edge, label = train_data["edge"], train_data["label"]
+        label = label.to("cpu").detach().numpy()
+        valid_data = dict(edge=edge[:, eids], label=label[eids])
 
         model.train()
 
@@ -166,7 +166,8 @@ def run_kfold(
 
     model = LightGCN(num_nodes=n_node)
     model.load_state_dict(average_weights)
-
+    torch.save(obj= {"model": model.state_dict()},
+                       f=os.path.join(model_dir, f"lgcn_best_model_kfold.pt"))
     return model.get_embedding(train_data['edge']).detach().cpu().numpy()
 
 

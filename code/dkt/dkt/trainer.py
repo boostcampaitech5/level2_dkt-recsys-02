@@ -180,6 +180,11 @@ def run_kfold(args,
             if args.scheduler == "plateau":
                 scheduler.step(best_auc)
         fold_weights.append(best_model)
+        save_checkpoint(state={"epoch": epoch + 1,
+                                   "state_dict": model_to_save.state_dict()},
+                            model_dir=args.model_dir,
+                            #########모델 이름_best_model.pt로 저장하기
+                            model_filename=f"{args.model.lower()}_best_model_{k}.pt")
 
     average_weights = {}
     for key in fold_weights[0].keys():
