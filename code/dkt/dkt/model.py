@@ -184,7 +184,7 @@ class ModelBase(nn.Module):
                 embed_list.append(self.embedding_dict[feature](feature_seq.long()))
 
         if (self.use_graph== True) & ('assessmentItemID' in input_dic): 
-            embed_list.append(self.graph_emb.item_emb(input_dic['category']['assessmentItemID'].long()))
+            embed_list.append(self.graph_emb.item_emb(input_dic['assessmentItemID'].long()))
 
         embed = torch.cat(embed_list, dim = 2)
         
