@@ -783,6 +783,9 @@ class TransLSTM_G(ModelBase):
         self.enc_dec_mask = None
         self.dec_mask = None
 
+        self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+        self.pos_decoder = PositionalEncoding(self.hidden_dim, self.dropout, self.max_seq_len)
+        
     def get_mask(self, seq_len):
         mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
         return mask.masked_fill(mask==1, float('-inf'))
