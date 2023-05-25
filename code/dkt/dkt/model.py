@@ -782,7 +782,11 @@ class TransLSTM_G(ModelBase):
         self.enc_mask = None
         self.enc_dec_mask = None
         self.dec_mask = None
-        
+
+    def get_mask(self, seq_len):
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1)).to(torch.float)
+        return mask.masked_fill(mask==1, float('-inf'))
+    
 #####################saint plus
     def forward(self, input_dic):
 
