@@ -126,68 +126,69 @@ def run_kfold(args,
     fold_weights = []
 
     for k, fold_dict in enumerate(kfolds):
-        model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
-        logger.info("Start Training: Fold %s", k + 1)
-        train_data = fold_dict['train']
-        valid_data = fold_dict['val']
-        train_loader, valid_loader = get_loaders(args=args, train=train_data, valid=valid_data)
+        if k == 0:
+            model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+            logger.info("Start Training: Fold %s", k + 1)
+            train_data = fold_dict['train']
+            valid_data = fold_dict['val']
+            train_loader, valid_loader = get_loaders(args=args, train=train_data, valid=valid_data)
 
-        # For warmup scheduler which uses step interval
-        args.total_steps = int(math.ceil(len(train_loader.dataset) / args.batch_size)) * (
-            args.n_epochs
-        )
-        args.warmup_steps = args.total_steps // 10
+            # For warmup scheduler which uses step interval
+            args.total_steps = int(math.ceil(len(train_loader.dataset) / args.batch_size)) * (
+                args.n_epochs
+            )
+            args.warmup_steps = args.total_steps // 10
 
-        optimizer = get_optimizer(model=model, args=args)
-        scheduler = get_scheduler(optimizer=optimizer, args=args)
+            optimizer = get_optimizer(model=model, args=args)
+            scheduler = get_scheduler(optimizer=optimizer, args=args)
 
-        best_auc = -1
-        early_stopping_counter = 0
-        for epoch in range(args.n_epochs):
-            logger.info("Start Training: Epoch %s", epoch + 1)
+            best_auc = -1
+            early_stopping_counter = 0
+            for epoch in range(args.n_epochs):
+                logger.info("Start Training: Epoch %s", epoch + 1)
 
-            # TRAIN
-            train_auc, train_acc, train_loss = train(train_loader=train_loader,
-                                                    model=model, optimizer=optimizer,
-                                                    scheduler=scheduler, args=args)
+                # TRAIN
+                train_auc, train_acc, train_loss = train(train_loader=train_loader,
+                                                        model=model, optimizer=optimizer,
+                                                        scheduler=scheduler, args=args)
 
-            # VALID
-            auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
+                # VALID
+                auc, acc, loss = validate(valid_loader=valid_loader, model=model, args=args)
 
-            wandb.log(dict(epoch=epoch,
-                        train_loss_epoch=train_loss,
-                        train_auc_epoch=train_auc,
-                        train_acc_epoch=train_acc,
-                        valid_auc_epoch=auc,
-                        valid_acc_epoch=acc))
-            
-            if auc > best_auc:
-                best_auc = auc
-                # nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
-                model_to_save = model.module if hasattr(model, "module") else model
-                #save_checkpoint(state={"epoch": epoch + 1,
-                #                    "state_dict": model_to_save.state_dict()},
-                #                model_dir=args.model_dir,
-                #                #########모델 이름_best_model.pt로 저장하기
-                #                model_filename=f"{args.model.lower()}_best_model_fold{k+1}.pt")
-                early_stopping_counter = 0
-                save_checkpoint(state={"epoch": epoch + 1,
-                                   "state_dict": model_to_save.state_dict()},
-                            model_dir=args.model_dir,
-                            #########모델 이름_best_model.pt로 저장하기
-                            model_filename=f"{args.model.lower()}_best_model_{k}.pt")
-            else:
-                early_stopping_counter += 1
-                if early_stopping_counter >= args.patience:
-                    logger.info(
-                        "EarlyStopping counter: %s out of %s",
-                        early_stopping_counter, args.patience
-                    )
-                    break
+                wandb.log(dict(epoch=epoch,
+                            train_loss_epoch=train_loss,
+                            train_auc_epoch=train_auc,
+                            train_acc_epoch=train_acc,
+                            valid_auc_epoch=auc,
+                            valid_acc_epoch=acc))
+                
+                if auc > best_auc:
+                    best_auc = auc
+                    # nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
+                    model_to_save = model.module if hasattr(model, "module") else model
+                    #save_checkpoint(state={"epoch": epoch + 1,
+                    #                    "state_dict": model_to_save.state_dict()},
+                    #                model_dir=args.model_dir,
+                    #                #########모델 이름_best_model.pt로 저장하기
+                    #                model_filename=f"{args.model.lower()}_best_model_fold{k+1}.pt")
+                    early_stopping_counter = 0
+                    save_checkpoint(state={"epoch": epoch + 1,
+                                    "state_dict": model_to_save.state_dict()},
+                                model_dir=args.model_dir,
+                                #########모델 이름_best_model.pt로 저장하기
+                                model_filename=f"{args.model.lower()}_best_model_{k}.pt")
+                else:
+                    early_stopping_counter += 1
+                    if early_stopping_counter >= args.patience:
+                        logger.info(
+                            "EarlyStopping counter: %s out of %s",
+                            early_stopping_counter, args.patience
+                        )
+                        break
 
-            # scheduler
-            if args.scheduler == "plateau":
-                scheduler.step(best_auc)
+                # scheduler
+                if args.scheduler == "plateau":
+                    scheduler.step(best_auc)
 
 
 
