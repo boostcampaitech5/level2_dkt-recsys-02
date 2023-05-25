@@ -779,6 +779,10 @@ class TransLSTM_G(ModelBase):
         self.graph_dim = super().get_graph_emb_dim()
         self.device = self.args.device
 
+        self.enc_mask = None
+        self.enc_dec_mask = None
+        self.dec_mask = None
+        
 #####################saint plus
     def forward(self, input_dic):
 
