@@ -5,7 +5,7 @@ import torch
 import wandb
 
 from lightgcn.args import parse_args
-from lightgcn.datasets import prepare_dataset
+from lightgcn.datasets import prepare_dataset, prepare_dataset_kfold
 from lightgcn import trainer
 from lightgcn.utils import get_logger, set_seeds, logging_conf
 import pdb
@@ -25,28 +25,43 @@ def main(args: argparse.Namespace):
     device = torch.device("cuda" if use_cuda else "cpu")
 
     logger.info("Preparing data ...")
-    train_data, test_data, id2index  = prepare_dataset(device=device, data_dir=args.data_dir)
-    n_node = len(id2index)
 
-    logger.info("Building Model ...")
-    model = trainer.build(
-        n_node=n_node,
-        embedding_dim=args.hidden_dim,
-        num_layers=args.n_layers,
-        alpha=args.alpha,
-    )
-    model = model.to(device)
-    
-    logger.info("Start Training ...")
-    graph_emb = trainer.run(
-        args=args,
-        model=model,
-        train_data=train_data,
+    if args.kfold:
+        train_data, test_data, id2index  = prepare_dataset(device=device, data_dir=args.data_dir)
+        n_node = len(id2index)
+
+        graph_emb = trainer.run_kfold(
+        args = args,
+        train_data = train_data,
+        n_node = n_node,
+        device = device,
         n_epochs=args.n_epochs,
         learning_rate=args.lr,
         model_dir=args.model_dir,
         )
-    
+
+    else: 
+        train_data, test_data, id2index  = prepare_dataset(device=device, data_dir=args.data_dir)
+        n_node = len(id2index)
+
+        logger.info("Building Model ...")
+        model = trainer.build(
+            n_node=n_node,
+            embedding_dim=args.hidden_dim,
+            num_layers=args.n_layers,
+            alpha=args.alpha,
+        )
+        model = model.to(device)
+        
+        logger.info("Start Training ...")
+        graph_emb = trainer.run(
+            model=model,
+            train_data=train_data,
+            n_epochs=args.n_epochs,
+            learning_rate=args.lr,
+            model_dir=args.model_dir,
+            )
+        
     try:
         curr_dir = __file__[:__file__.rfind('/')+1]
         with open(curr_dir + '../dkt/models_param/feature_mapper.pkl', 'rb') as f: feature_maping_info = pickle.load(f)

@@ -5,6 +5,7 @@ import torch
 import wandb
 import pdb
 from dkt import trainer#, trainer_custom
+
 from dkt.args import parse_args
 from dkt.dataloader import Preprocess
 from dkt.utils import get_logger, set_seeds, logging_conf
@@ -52,7 +53,6 @@ def config2args(args):
     temp = vars(args)
     for key, value in dict(wandb.config).items():
         temp[key] = value
-    # pdb.set_trace()
     return args
 
 def graph_name_parser(args):
@@ -78,24 +78,18 @@ def sweep_main(args):
     train_data: pd.Dataframe = preprocess.get_train_data()
     
     train_data, valid_data = preprocess.split_data_df(data=train_data)    
-    
-    if args.model == 'tabnet' or args.model == 'catboost':
-        preprocess.load_test_data(file_name=args.test_file_name)
-        test_data = preprocess.get_test_data()
-        
-        if args.model == 'tabnet':
-            cat_dims = preprocess.get_cat_dims()
-            trainer_custom.tabnet(args=args, train_data=train_data, valid_data=valid_data, test_data=test_data, categorical_dims=cat_dims)
+        #if args.model == 'tabnet':
+        #    cat_dims = preprocess.get_cat_dims()
+        #    trainer_custom.tabnet(args=args, train_data=train_data, valid_data=valid_data, test_data=test_data, categorical_dims=cat_dims)
             
-        else: 
-            trainer_custom.catboost(args=args, train_data=train_data, valid_data=valid_data, test_data=test_data)
+        #else: 
+        #    trainer_custom.catboost(args=args, train_data=train_data,s valid_data=valid_data, test_data=test_data)
             
-    else:
-        logger.info("Building Model ...")
-        model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
-        
-        logger.info("Start Training ...")
-        trainer.run(args=args, train_data=train_data, valid_data=valid_data, model=model)
+    logger.info("Building Model ...")
+    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
+
+    logger.info("Start Training ...")
+    trainer.run(args=args, train_data=train_data, valid_data=valid_data, model=model)
     
 
 if __name__ == "__main__":

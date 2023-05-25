@@ -1,5 +1,5 @@
 import os
-
+import pdb
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -48,6 +48,7 @@ def run(
         eids = np.random.permutation(eids)[:1000]
         edge, label = train_data["edge"], train_data["label"]
         label = label.to("cpu").detach().numpy()
+        pdb.set_trace()
         valid_data = dict(edge=edge[:, eids], label=label[eids])
 
     logger.info(f"Training Started : n_epochs={n_epochs}")
@@ -96,6 +97,79 @@ def run(
         file.close()
         
     return model.get_embedding(train_data['edge']).detach().cpu().numpy()
+
+
+
+
+def run_kfold(
+    args,
+    train_data: dict,
+    n_node: int,
+    device: str,
+    n_epochs: int = 100,
+    learning_rate: float = 0.01,
+    model_dir: str = None,
+):
+    
+    folds_weights = []
+
+    for i in range(args.n_folds):
+        model = build(
+            n_node=n_node,
+            embedding_dim=args.hidden_dim,
+            num_layers=args.n_layers,
+            alpha=args.alpha
+        )
+
+        model = model.to(device)
+        eids = np.arange(len(train_data["label"]))
+        eids = np.random.permutation(eids)[1000*i:1000*(i+1)]
+        edge, label = train_data["edge"], train_data["label"]
+        label = label.to("cpu").detach().numpy()
+        valid_data = dict(edge=edge[:, eids], label=label[eids])
+
+        model.train()
+
+        optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
+
+        os.makedirs(name=model_dir, exist_ok=True)
+
+        logger.info(f"Training Started : n_epochs={n_epochs}")
+        best_auc, best_epoch = 0, -1
+
+        for e in range(n_epochs):
+            logger.info("Epoch: %s", e)
+            # TRAIN
+            train_auc, train_acc, train_loss = train(train_data=train_data, model=model, optimizer=optimizer)
+        
+            # VALID
+            auc, acc = validate(valid_data=valid_data, model=model)
+            wandb.log(dict(train_loss_epoch=train_loss,
+                        train_acc_epoch=train_acc,
+                        train_auc_epoch=train_auc,
+                        valid_acc_epoch=acc,
+                        valid_auc_epoch=auc))
+
+            if auc > best_auc:
+                logger.info("Best model updated AUC from %.4f to %.4f", best_auc, auc)
+                best_auc, best_epoch = auc, e
+                best_acc = acc
+                best_model = model.state_dict()
+        
+        folds_weights.append(best_model)
+        logger.info(f"Best Weight Confirmed : {best_epoch+1}'th epoch")
+
+    average_weights = {}
+    for key in folds_weights[0].keys():
+        average_weights[key] = torch.stack([fold[key].float() for fold in folds_weights], dim=0).mean(dim=0)
+    for key in average_weights: average_weights[key].to(dtype = torch.int64)
+
+    model = LightGCN(num_nodes=n_node)
+    model.load_state_dict(average_weights)
+    torch.save(obj= {"model": model.state_dict()},
+                       f=os.path.join(model_dir, f"lgcn_best_model_kfold.pt"))
+    return 
+
 
 
 

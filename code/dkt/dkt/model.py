@@ -30,13 +30,15 @@ class GraphEmbedding:
             for i, label in enumerate(item_label):
                 if i == 0:
                     self.hidden_dim = len(item_emb_dic[label])
-                    item_emb.append(item_emb_dic[label])
-                item_emb.append(item_emb_dic[label])
+                    item_emb.append(np.expand_dims(item_emb_dic[label], 0))
+                item_emb.append(np.expand_dims(item_emb_dic[label], 0))
+            item_emb = np.concatenate(item_emb, axis=0)
             item_emb = torch.tensor(item_emb).to(self.args.device)
             self.item_emb = nn.Embedding.from_pretrained(item_emb)
 
     def item_emb(self, item_seq): return self.item_emb(item_seq)
     def user_emb(self, user_seq): return self.user_emb(user_seq)
+
     
 
 class ModelBase(nn.Module):
@@ -50,7 +52,7 @@ class ModelBase(nn.Module):
         n_tags: int = 913,
         n_dayname : int = 7,
         n_bigclass : int = 9,
-        n_cont : int = 18,
+        n_cont : int = 3,
 
         **kwargs
     ):
@@ -64,7 +66,7 @@ class ModelBase(nn.Module):
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
-        self.n_dayname = n_dayname
+        #self.n_dayname = n_dayname
         self.n_bigclass = n_bigclass
         self.n_cont = n_cont
         self.resize_factor = self.args.resize_factor
@@ -72,15 +74,14 @@ class ModelBase(nn.Module):
         self.positional_interaction1 = self.args.pos_int1
         self.positional_interaction2 = self.args.pos_int2
 
-
-        curr_dir = __file__[:__file__.rfind('/')+1]
-        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f: self.num_feature =  json.load(f)
-
         self.use_graph = self.args.use_graph
         if self.use_graph:
             self.graph_emb = GraphEmbedding(args, self.args.graph_model)
             self.graph_emb_dim = self.args.graph_dim
 
+        curr_dir = __file__[:__file__.rfind('/')+1]
+        with open(curr_dir + f'../models_param/num_feature.json', 'r') as f:
+            self.num_feature =  json.load(f)
 ######### Embeddings
         # hd: Hidden dimension, intd: Intermediate hidden dimension
         if args.model.lower() =='sakt':
@@ -94,7 +95,7 @@ class ModelBase(nn.Module):
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
         self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
-        self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
+        #self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
         self.embedding_bigclass = nn.Embedding(self.num_feature['bigclass'] + 1, intd)
         
 
@@ -113,7 +114,7 @@ class ModelBase(nn.Module):
         self.embedding_dict['interaction'] = self.embedding_interaction
         self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
-        self.embedding_dict['dayname'] = self.embedding_dayname
+        #self.embedding_dict['dayname'] = self.embedding_dayname
         self.embedding_dict['bigclass'] = self.embedding_bigclass
 
 ########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
@@ -143,6 +144,7 @@ class ModelBase(nn.Module):
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
             self.fc = nn.Linear(hd, 1)
+            
 
     def get_interaction1(self, interactions):
 
@@ -158,8 +160,7 @@ class ModelBase(nn.Module):
         emb_list = []
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
-            for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
+            for id, it in zip(item_seq, interaction): 
                 tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
@@ -358,6 +359,10 @@ class LSTMATTN(ModelBase):
             attention_probs_dropout_prob=self.drop_out,
         )
         self.attn = BertEncoder(self.config)
+        if self.use_res:
+            self.fc = nn.Linear(self.hidden_dim + self.hidden_dim, 1)
+        else:
+            self.fc = nn.Linear(self.hidden_dim, 1)
     ######################## FE시 추가해야함
     def forward(self, input_dic):
 
@@ -422,14 +427,7 @@ class BERT(ModelBase):
         self.encoder = BertModel(self.config)
     ######################## FE시 추가해야함
     def forward(self, input_dic):
-        #X, batch_size = super().forward(testId=testId,
-        #                                assessmentItemID=assessmentItemID,
-        #                                KnowledgeTag=KnowledgeTag,
-        #                                answerCode=answerCode,
-        #                                mask=mask,
-        #                                interaction=interaction,
-        #                                 dayname = dayname,
-        #                                 bigclass = bigclass,)
+
 
         X, batch_size = super().dic_forward(input_dic)
         mask = input_dic['category']['mask']
@@ -869,11 +867,7 @@ class TransLSTM_G(ModelBase):
         out = self.fc(out).view(batch_size, -1)
         return out
     
-#####################saint plus
-"""
-Reference:
-https://arxiv.org/abs/2002.07033
-"""
+
 
 class FFN(nn.Module):
     def __init__(self, d_ffn, d_model, dropout):
@@ -1364,7 +1358,6 @@ class SAKT(ModelBase):
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
             for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
                 tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
@@ -1471,8 +1464,8 @@ class SAKTLSTM(ModelBase):
         for item_seq, interaction in zip(item_seqs, interactions):
             tmp = []
             for id, it in zip(item_seq, interaction):
-                self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0) 
-                tmp.append(self.interaction_dic[int(id)](torch.tensor(it).cpu()).unsqueeze(dim = 0).unsqueeze(dim = 0))
+                x = self.interaction_dic[int(id)](it.clone().detach().cpu().long()).unsqueeze(dim=0).unsqueeze(dim=0)
+                tmp.append(x)
             emb_list.append(torch.cat(tmp, dim = 1))
         pos = torch.arange(self.max_seq_len).repeat(batch_size, 1)
    
@@ -1483,7 +1476,7 @@ class SAKTLSTM(ModelBase):
     
     def forward(self ,input_dic):
 
-
+#        pdb.set_trace()
         interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
                                                         input_dic['category']['interaction'])
 

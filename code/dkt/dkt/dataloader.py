@@ -160,28 +160,6 @@ class Preprocess:
         num_feature['dayname'] = df['dayname'].nunique()
         num_feature['bigclass'] = df['bigclass'].nunique()
 
-        # 범주형 변수 : [KnowledgeTag,dayname, bigclass]
-        # 추가된 피쳐
-        # Feat = 'user_correct_answer', #유저가 문제 푼 횟수
-        #  'user_total_answer', #유저가 문제 맞춘 횟수
-        #  'user_acc', #유저의 정답률
-        #  'test_mean', #문항의 정답률
-        #  'test_sum', #문항의 정답횟수
-        #  'tag_mean', #태그의 정답률
-        #  'tag_sum', #태그의 정답횟수
-        #  'elapsed', #유저의 문제풀이시간
-        #  'elapsed_cumsum', #유저의 문제풀이시간 누적
-        #  'elapsed_med', #유저의 문제풀이시간 중앙값
-        #  'month', #월
-        #  'day', #일
-        #  'hour', #시간
-        #  'dayname', #요일
-        #  'bigclass', #대분류
-        #  'bigclasstime', #대분류별 문제풀이시간
-        #  'bigclass_acc', #대분류별 정답률
-        #  'bigclass_sum', #대분류별 문제 맞춘 횟수
-        #  'bigclass_count', #대분류별 문제 푼 횟수
-        #  'elo' #유저의 문제풀이능력
 
         
         curr_dir = __file__[:__file__.rfind('/')+1]
@@ -354,29 +332,29 @@ class DKTDataset(torch.utils.data.Dataset):
             #"userID" : torch.tensor(userID, dtype=torch.int),
             #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
             "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
-            "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
+            #"dayname" : torch.tensor(dayname + 1, dtype=torch.int),
             "bigclass" : torch.tensor(bigclass + 1, dtype = torch.int)
             }
 
             cont_data = {
                 # "New Feature" : torch.tensor(New Feature, dtype=torch.float),
-                "user_correct_answer" : torch.tensor(user_correct_answer, dtype=torch.float),
-                "user_total_answer" : torch.tensor(user_total_answer, dtype=torch.float),
-                "user_acc" : torch.tensor(user_acc, dtype=torch.float),
-                "test_mean" : torch.tensor(test_mean, dtype=torch.float),
-                "test_sum" : torch.tensor(test_sum, dtype=torch.float),
-                "tag_mean" : torch.tensor(tag_mean, dtype=torch.float),
-                "tag_sum" : torch.tensor(tag_sum, dtype=torch.float),
+                #"user_correct_answer" : torch.tensor(user_correct_answer, dtype=torch.float),
+                #"user_total_answer" : torch.tensor(user_total_answer, dtype=torch.float),
+                #"user_acc" : torch.tensor(user_acc, dtype=torch.float),
+                #"test_mean" : torch.tensor(test_mean, dtype=torch.float),
+                #"test_sum" : torch.tensor(test_sum, dtype=torch.float),
+                #"tag_mean" : torch.tensor(tag_mean, dtype=torch.float),
+                #"tag_sum" : torch.tensor(tag_sum, dtype=torch.float),
                 "elapsed" : torch.tensor(elapsed, dtype=torch.float),
-                "elapsed_cumsum" : torch.tensor(elapsed_cumsum, dtype=torch.float),
-                "month" : torch.tensor(month, dtype=torch.float),
-                "day" : torch.tensor(day, dtype=torch.float),
-                "hour" : torch.tensor(hour, dtype=torch.float),
-                "elapsed_med" : torch.tensor(elapsed_med, dtype=torch.float),
-                "bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
+                #"elapsed_cumsum" : torch.tensor(elapsed_cumsum, dtype=torch.float),
+                #"month" : torch.tensor(month, dtype=torch.float),
+                #"day" : torch.tensor(day, dtype=torch.float),
+                #"hour" : torch.tensor(hour, dtype=torch.float),
+                #"elapsed_med" : torch.tensor(elapsed_med, dtype=torch.float),
+                #"bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
                 "bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
-                "bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
-                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
+                #"bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
+                #"bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
                 "elo" : torch.tensor(elo, dtype=torch.float),
                 
             }
@@ -427,29 +405,29 @@ class DKTDataset(torch.utils.data.Dataset):
             #"userID" : torch.tensor(userID, dtype=torch.int),
             #New Feature = torch.tensor(New Feature + 1, dtype=torch.int)
             "question_N" : torch.tensor(question_N + 1, dtype=torch.int),
-            "dayname" : torch.tensor(dayname + 1, dtype=torch.int),
+            #"dayname" : torch.tensor(dayname + 1, dtype=torch.int),
             "bigclass" : torch.tensor(bigclass + 1, dtype = torch.int)
             }
             
             cont_data = {
                 # "New Feature" : torch.tensor(New Feature, dtype=torch.float),
-                "user_correct_answer" : torch.tensor(user_correct_answer, dtype=torch.float),
-                "user_total_answer" : torch.tensor(user_total_answer, dtype=torch.float),
-                "user_acc" : torch.tensor(user_acc, dtype=torch.float),
-                "test_mean" : torch.tensor(test_mean, dtype=torch.float),
-                "test_sum" : torch.tensor(test_sum, dtype=torch.float),
-                "tag_mean" : torch.tensor(tag_mean, dtype=torch.float),
-                "tag_sum" : torch.tensor(tag_sum, dtype=torch.float),
+                #"user_correct_answer" : torch.tensor(user_correct_answer, dtype=torch.float),
+                #"user_total_answer" : torch.tensor(user_total_answer, dtype=torch.float),
+                #"user_acc" : torch.tensor(user_acc, dtype=torch.float),
+                #"test_mean" : torch.tensor(test_mean, dtype=torch.float),
+                #"test_sum" : torch.tensor(test_sum, dtype=torch.float),
+                #"tag_mean" : torch.tensor(tag_mean, dtype=torch.float),
+                #"tag_sum" : torch.tensor(tag_sum, dtype=torch.float),
                 "elapsed" : torch.tensor(elapsed, dtype=torch.float),
-                "elapsed_cumsum" : torch.tensor(elapsed_cumsum, dtype=torch.float),
-                "month" : torch.tensor(month, dtype=torch.float),
-                "day" : torch.tensor(day, dtype=torch.float),
-                "hour" : torch.tensor(hour, dtype=torch.float),
-                "elapsed_med" : torch.tensor(elapsed_med, dtype=torch.float),
-                "bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
-                "bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
-                "bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
-                "bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
+                #"elapsed_cumsum" : torch.tensor(elapsed_cumsum, dtype=torch.float),
+                #"month" : torch.tensor(month, dtype=torch.float),
+                #"day" : torch.tensor(day, dtype=torch.float),
+                #"hour" : torch.tensor(hour, dtype=torch.float),
+                #"elapsed_med" : torch.tensor(elapsed_med, dtype=torch.float),
+                #"bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
+                #"bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
+                #"bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
+                #"bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
                 "elo" : torch.tensor(elo, dtype=torch.float)
                 
             }
@@ -729,14 +707,14 @@ class DKTDataset(torch.utils.data.Dataset):
         return assessmentItemID_list, testId_list, KnowledgeTag_list, answerCode_list, question_N_list, user_correct_answer_list, user_total_answer_list, user_acc_list, test_mean_list, test_mean_list,test_sum_list, tag_mean_list, tag_sum_list, elapsed_list,elapsed_cumsum_list, month_list, hour_list, day_list, dayname_list, elapsed_med_list, bigclass_list, bigclasstime_list,bigclass_acc_list,bigclass_sum_list,bigclass_count_list, elo_list
 
 def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils.data.DataLoader]:
-    pin_memory = False
+    pin_memory = True
     train_loader, valid_loader = None, None
 
     if train is not None:
         trainset = DKTDataset(train, args)
         train_loader = torch.utils.data.DataLoader(
             trainset,
-            num_workers=args.num_workers,
+            num_workers=0,
             shuffle=True,
             batch_size=args.batch_size,
             pin_memory=pin_memory,
@@ -745,7 +723,7 @@ def get_loaders(args, train: np.ndarray, valid: np.ndarray) -> Tuple[torch.utils
         valset = DKTDataset(valid, args)
         valid_loader = torch.utils.data.DataLoader(
             valset,
-            num_workers=args.num_workers,
+            num_workers=0,
             shuffle=False,
             batch_size=args.batch_size,
             pin_memory=pin_memory,
