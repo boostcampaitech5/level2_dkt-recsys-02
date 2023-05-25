@@ -70,10 +70,7 @@ def run(args,
         
 
         if auc < 0.51 : 
-            logger.info(
-                    "Too Low AUC",
-                    early_stopping_counter, args.patience
-                )
+            logger.info("Too Low AUC")
             break
 
         if auc > best_auc:
@@ -174,7 +171,11 @@ def run_kfold(args,
                 #                #########모델 이름_best_model.pt로 저장하기
                 #                model_filename=f"{args.model.lower()}_best_model_fold{k+1}.pt")
                 early_stopping_counter = 0
-                best_model = model.state_dict()
+                save_checkpoint(state={"epoch": epoch + 1,
+                                   "state_dict": model_to_save.state_dict()},
+                            model_dir=args.model_dir,
+                            #########모델 이름_best_model.pt로 저장하기
+                            model_filename=f"{args.model.lower()}_best_model_{k}.pt")
             else:
                 early_stopping_counter += 1
                 if early_stopping_counter >= args.patience:
@@ -187,24 +188,7 @@ def run_kfold(args,
             # scheduler
             if args.scheduler == "plateau":
                 scheduler.step(best_auc)
-        fold_weights.append(best_model)
-        save_checkpoint(state={"epoch": epoch + 1,
-                                   "state_dict": model_to_save.state_dict()},
-                            model_dir=args.model_dir,
-                            #########모델 이름_best_model.pt로 저장하기
-                            model_filename=f"{args.model.lower()}_best_model_{k}.pt")
 
-    average_weights = {}
-    for key in fold_weights[0].keys():
-        average_weights[key] = torch.stack([fold[key].float() for fold in fold_weights], dim=0).mean(dim=0)
-    for key in average_weights: average_weights[key].to(dtype = torch.int64)
-
-    model: torch.nn.Module = trainer.get_model(args=args).to(args.device)
-    model.load_state_dict(average_weights)
-
-    save_checkpoint(state={"state_dict": model_to_save.state_dict()},
-                            model_dir=args.model_dir,
-                            model_filename=f"{args.model.lower()}_best_model_kfold.pt")
 
 
 def train(train_loader: torch.utils.data.DataLoader,
@@ -217,7 +201,8 @@ def train(train_loader: torch.utils.data.DataLoader,
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in enumerate(train_loader):
+    step = 0
+    for batch in tqdm(train_loader):
         for key in batch:
             tmp = {k: v.to(args.device) for k, v in batch[key].items()}
             batch[key] = tmp
@@ -243,6 +228,8 @@ def train(train_loader: torch.utils.data.DataLoader,
         del batch, tmp
         gc.collect()
         torch.cuda.empty_cache()
+        step += 1
+        
         
     total_preds = torch.cat(total_preds).cpu().numpy()
     total_targets = torch.cat(total_targets).cpu().numpy()

@@ -189,7 +189,7 @@ saktlstm:
       min: 0.0005
       max: 0.01
     batch_size:
-      values: [32, 64, 128, 256, 512]
+      values: [64, 128, 256, 512]
     n_layers:
       values: [1, 2, 3, 4, 5]
     drop_out:
@@ -199,7 +199,7 @@ saktlstm:
       min: 5
       max: 300
     hidden_dim:
-      values: [32, 64, 128, 256, 512, 1024]
+      values: [32, 64, 128, 256, 512]
     shuffle_n:
       values: [0, 1]
     use_res:

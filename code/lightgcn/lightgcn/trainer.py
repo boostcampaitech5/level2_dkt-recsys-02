@@ -168,7 +168,7 @@ def run_kfold(
     model.load_state_dict(average_weights)
     torch.save(obj= {"model": model.state_dict()},
                        f=os.path.join(model_dir, f"lgcn_best_model_kfold.pt"))
-    return model.get_embedding(train_data['edge']).detach().cpu().numpy()
+    return 
 
 
 

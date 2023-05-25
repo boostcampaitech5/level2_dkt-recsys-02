@@ -52,7 +52,7 @@ class ModelBase(nn.Module):
         n_tags: int = 913,
         n_dayname : int = 7,
         n_bigclass : int = 9,
-        n_cont : int = 18,
+        n_cont : int = 3,
 
         **kwargs
     ):
@@ -66,7 +66,7 @@ class ModelBase(nn.Module):
         self.n_tests = n_tests
         self.n_questions = n_questions
         self.n_tags = n_tags
-        self.n_dayname = n_dayname
+        #self.n_dayname = n_dayname
         self.n_bigclass = n_bigclass
         self.n_cont = n_cont
         self.resize_factor = self.args.resize_factor
@@ -95,7 +95,7 @@ class ModelBase(nn.Module):
         self.embedding_tag = nn.Embedding(n_tags + 1, intd)
         self.embedding_question_N = nn.Embedding(self.num_feature['question_N'] + 1, intd)
         #self.embedding_New Feature = nn.Embedding(n_New Feature + 1, intd)
-        self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
+        #self.embedding_dayname = nn.Embedding(self.num_feature['dayname'] + 1, intd)
         self.embedding_bigclass = nn.Embedding(self.num_feature['bigclass'] + 1, intd)
         
 
@@ -114,7 +114,7 @@ class ModelBase(nn.Module):
         self.embedding_dict['interaction'] = self.embedding_interaction
         self.embedding_dict['question_N'] = self.embedding_question_N
         #self.embedding_dict['New Feature'] = self.New Feature Embedding
-        self.embedding_dict['dayname'] = self.embedding_dayname
+        #self.embedding_dict['dayname'] = self.embedding_dayname
         self.embedding_dict['bigclass'] = self.embedding_bigclass
 
 ########Concatentaed Embedding Projection, Feature 개수 바뀌면 바꿔야함 4, 5, 6
@@ -144,6 +144,7 @@ class ModelBase(nn.Module):
             self.fc = nn.Linear(hd + self.graph_emb_dim, 1)
         else:
             self.fc = nn.Linear(hd, 1)
+            
 
     def get_interaction1(self, interactions):
 
@@ -358,6 +359,10 @@ class LSTMATTN(ModelBase):
             attention_probs_dropout_prob=self.drop_out,
         )
         self.attn = BertEncoder(self.config)
+        if self.use_res:
+            self.fc = nn.Linear(self.hidden_dim + self.hidden_dim, 1)
+        else:
+            self.fc = nn.Linear(self.hidden_dim, 1)
     ######################## FE시 추가해야함
     def forward(self, input_dic):
 
@@ -1440,7 +1445,7 @@ class SAKTLSTM(ModelBase):
     
     def forward(self ,input_dic):
 
-
+#        pdb.set_trace()
         interaction_emb = self.get_interaction(input_dic['category']['assessmentItemID'], 
                                                         input_dic['category']['interaction'])
 
