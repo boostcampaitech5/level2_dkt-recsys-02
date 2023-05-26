@@ -25,6 +25,7 @@ def main(args: argparse.Namespace):
     device = torch.device("cuda" if use_cuda else "cpu")
 
     logger.info("Preparing data ...")
+
     if args.kfold:
         train_data, test_data, id2index  = prepare_dataset(device=device, data_dir=args.data_dir)
         n_node = len(id2index)
