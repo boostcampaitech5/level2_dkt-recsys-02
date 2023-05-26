@@ -425,11 +425,10 @@ class DKTDataset(torch.utils.data.Dataset):
                 #"hour" : torch.tensor(hour, dtype=torch.float),
                 #"elapsed_med" : torch.tensor(elapsed_med, dtype=torch.float),
                 #"bigclasstime" : torch.tensor(bigclasstime, dtype=torch.float),
-                #"bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
+                "bigclass_acc" : torch.tensor(bigclass_acc, dtype=torch.float),
                 #"bigclass_sum" : torch.tensor(bigclass_sum, dtype=torch.float),
                 #"bigclass_count" : torch.tensor(bigclass_count, dtype=torch.float),
-                "elo" : torch.tensor(elo, dtype=torch.float)
-                
+                "elo" : torch.tensor(elo, dtype=torch.float)    
             }
 
 ####################Mask 만들기       
@@ -442,7 +441,6 @@ class DKTDataset(torch.utils.data.Dataset):
             else:
                 for k, seq in cat_data.items():
                     # Pre-padding non-valid sequences
-                    pdb.set_trace()
                     tmp = torch.zeros(self.max_seq_len)
                     tmp[self.max_seq_len-seq_len:] = cat_data[k]
                     # tmp[self.max_seq_len-seq_len:self.max_seq_len] = cat_data[k]

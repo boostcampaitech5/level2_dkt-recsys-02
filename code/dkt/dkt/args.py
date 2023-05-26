@@ -25,6 +25,9 @@ def parse_args():
         "--model_name", default="best_model.pt", type=str, help="model file name"
     )
     parser.add_argument(
+        "--fold", default="", type=str, help="model fold"
+    )
+    parser.add_argument(
         "--output_dir", default="outputs/", type=str, help="output directory"
     )
     parser.add_argument(
@@ -35,7 +38,7 @@ def parse_args():
         "--max_seq_len", default=20, type=int, help="max sequence length"
     )
     parser.add_argument(
-        "--data_augmentation", default=True, type=bool, help="Apply sliding window"
+        "--data_augmentation", default=False, type=bool, help="Apply sliding window"
     )
     parser.add_argument(
         "--window", default=10, type=int, help="Size of sliding window"
