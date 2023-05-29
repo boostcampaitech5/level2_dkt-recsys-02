@@ -114,8 +114,8 @@ def main(args):
     train = df.drop(['answerCode'], axis=1)
 
     groups = train['userID']
-    fold_len = 2
-    gkf = GroupKFold(n_splits = 2)
+    fold_len = 5
+    gkf = GroupKFold(n_splits = 5)
 
     k_auc_list = []
     result_auc = 0
@@ -131,7 +131,7 @@ def main(args):
         valid_sets=[lgb_train,lgb_test],
         verbose_eval=100,
         early_stopping_rounds=100,
-        num_boost_round=500,
+        num_boost_round=2000,
         callbacks=[wandb.lightgbm.wandb_callback()]
     )
         wandb.lightgbm.log_summary(model, save_model_checkpoint=True)
