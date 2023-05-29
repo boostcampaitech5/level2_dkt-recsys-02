@@ -30,19 +30,19 @@ lstm:
     max_seq_len: 25.0
     n_epochs: 100.0
 lstmattn:
-  best_auc: 0.8255093143459634
+  best_auc: 0.8286815035432061
   parameter:
-    batch_size: 32.0
-    drop_out: 0.26915160444058467
+    batch_size: 1024.0
+    drop_out: 0.002222926393187441
     graph_dim: 250.0
-    hidden_dim: 512.0
-    lr: 0.009731779805332918
-    max_seq_len: 115.0
-    n_layers: 1.0
-    pos_int1: 1.0
-    shuffle_n: 2.0
-    use_res: 0.0
-    window: 34.0
+    hidden_dim: 64.0
+    lr: 0.003431882887626233
+    max_seq_len: 24.0
+    n_layers: 2.0
+    pos_int1: 0.0
+    shuffle_n: 0.0
+    use_res: 1.0
+    window: 9.0
 saint:
   best_auc: -1
   parameter: null

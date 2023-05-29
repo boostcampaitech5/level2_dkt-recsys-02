@@ -394,10 +394,17 @@ def save_checkpoint(state: dict, model_dir: str, model_filename: str) -> None:
 
 def load_model(args):
     ##########모델 이름_best_model.pt 불러오기
-    model_path = os.path.join(args.model_dir, args.model.lower() + '_' +  args.model_name)
-    logger.info("Loading Model from: %s", model_path)
-    load_state = torch.load(model_path)
-    model = get_model(args)
+    if args.fold == '':
+        model_path = os.path.join(args.model_dir, args.model.lower() + '_' +  args.model_name)
+        logger.info("Loading Model from: %s", model_path)
+        load_state = torch.load(model_path)
+        model = get_model(args)
+    else:
+        model_path = os.path.join('/opt/ml/models', args.model.lower() + '_' +  f'best_model_{args.fold}.pt')
+        logger.info("Loading Model from: %s", model_path)
+        load_state = torch.load(model_path)
+        model = get_model(args)
+        
 
     # load model state
     model.load_state_dict(load_state["state_dict"], strict=True)

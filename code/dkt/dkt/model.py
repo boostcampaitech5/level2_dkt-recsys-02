@@ -61,7 +61,7 @@ class ModelBase(nn.Module):
         self.args = args
         self.use_res = self.args.use_res
         self.max_seq_len = self.args.max_seq_len
-        self.hidden_dim = hidden_dim
+        self.hidden_dim = args.hidden_dim
         self.n_layers = n_layers
         self.n_tests = n_tests
         self.n_questions = n_questions
@@ -414,15 +414,15 @@ class BERT(ModelBase):
             n_questions,
 
         )
-        self.n_heads = n_heads
-        self.drop_out = drop_out
+        self.n_heads = args.n_heads
+        self.drop_out = args.drop_out
         # Bert config
         self.config = BertConfig(
             3,  # not used
-            hidden_size=self.hidden_dim,
-            num_hidden_layers=self.n_layers,
-            num_attention_heads=self.n_heads,
-            max_position_embeddings=max_seq_len,
+            hidden_size= self.hidden_dim,
+            num_hidden_layers= self.n_layers,
+            num_attention_heads= self.n_heads,
+            max_position_embeddings=args.max_seq_len,
         )
         self.encoder = BertModel(self.config)
     ######################## FE시 추가해야함
@@ -442,74 +442,6 @@ class BERT(ModelBase):
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)
         return out
-    
-    
-    def forward(self, input_dic):
-        """
-        "now_testId"
-        "now_assessmentItemID"
-        "now_KnowledgeTag"
-        "now_answerCode"
-        "now_New Feature"
-
-        "past_testId"
-        "past_assessmentItemID"
-        "past_KnowledgeTag",
-        "past_answerCode"
-        "past_New Feature"
-        
-        """
-        past_answerCode = input_dic['past_answerCode']
-        # masking 
-        mask_pad = torch.BoolTensor(past_answerCode.cpu() > 0).unsqueeze(1).unsqueeze(1) # (batch_size, 1, 1, max_len)
-        mask_time = (1 - torch.triu(torch.ones((1, 1, past_answerCode.size(1), past_answerCode.size(1))), diagonal=1)).bool() # (batch_size, 1, max_len, max_len)
-        mask = (mask_pad & mask_time).to(self.device) # (batch_size, 1, max_len, max_len)
-
-        # past
-        past_cat_emb_list = []
-        for idx, cat_col in enumerate(self.past_cat_cols):
-            past_cat_emb_list.append(self.past_emb_dict[cat_col](input_dic[cat_col]))
-        if self.use_graph: 
-            past_cat_emb_list.append(self.graph_emb.item_emb(input_dic['past_assessmentItemID'].long()))
-
-        past_cat_emb = torch.concat(past_cat_emb_list, dim = 2)
-        past_cat_emb = self.past_cat_emb(past_cat_emb)
-        #past_num_emb = self.past_num_emb(past_num_feature)
-
-        #past_emb = torch.concat([past_cat_emb, past_num_emb], dim = 2)
-        past_emb = past_cat_emb, 
-        past_emb += self.past_answerCode_emb(past_answerCode.to(self.device))
-        past_emb = self.emb_layernorm(past_emb) # LayerNorm
-
-        for block in self.past_blocks:
-            past_emb, attn_dist = block(past_emb, mask)
-
-        past_emb, _ = self.past_lstm(past_emb)
-
-        # now
-        now_cat_emb_list = []
-        for idx, cat_col in enumerate(self.cat_cols):
-            now_cat_emb_list.append(self.now_emb_dict[cat_col](self.now_cat_feature[:, :, idx]))
-        if self.use_graph: 
-            now_cat_emb_list.append(self.graph_emb.item_emb(input_dic['now_assessmentItemID'].long()))
-
-        now_cat_emb = torch.concat(now_cat_emb_list, dim = -1)
-        now_cat_emb = self.now_cat_emb(now_cat_emb)
-
-        #now_num_emb = self.now_num_emb(now_num_feature)
-
-        #now_emb = torch.concat([now_cat_emb, now_num_emb], dim = -1)
-        now_emb = now_cat_emb
-        for block in self.now_blocks:
-            now_emb, attn_dist = block(now_emb, mask)
-
-        now_emb, _ = self.now_lstm(now_emb)
-        
-        # predict
-        emb = torch.concat([self.dropout(past_emb), self.dropout(now_emb)], dim = -1)
-        output = self.predict_layer(emb)
-
-        return output.squeeze(2)
 
 
 
