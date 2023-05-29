@@ -1,0 +1,30 @@
+bert:
+  best_auc: -1
+  parameter: null
+catboost:
+  best_auc: -1
+  parameter: null
+lastquery:
+  best_auc: -1
+  parameter: null
+lgbm:
+  best_auc: -1
+  parameter: null
+lightgcn:
+  best_auc: 0.8364824449051275
+  parameter:
+    hidden_dim: 255.0
+    lr: 0.00331226653603121
+    n_layers: 1.0
+lstm:
+  best_auc: -1
+  parameter: null
+lstmattn:
+  best_auc: -1
+  parameter: null
+saint:
+  best_auc: -1
+  parameter: null
+translstm_g:
+  best_auc: -1
+  parameter: null

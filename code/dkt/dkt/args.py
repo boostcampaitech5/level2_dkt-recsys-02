@@ -3,7 +3,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
+    
     parser.add_argument("--seed", default=42, type=int, help="seed")
     parser.add_argument("--device", default="cpu", type=str, help="cpu or gpu")
     parser.add_argument(
@@ -23,6 +23,9 @@ def parse_args():
     )
     parser.add_argument(
         "--model_name", default="best_model.pt", type=str, help="model file name"
+    )
+    parser.add_argument(
+        "--fold", default="", type=str, help="model fold"
     )
     parser.add_argument(
         "--output_dir", default="outputs/", type=str, help="output directory"
@@ -53,20 +56,41 @@ def parse_args():
         "--graph_model", default="lgcn", type=str,  help="Which model to use"
     )
     parser.add_argument(
+        "--graph_dim", default=64, type=int,  help="Graph dim"
+    )
+    parser.add_argument(
+        "--use_res", default=False, type=bool,  help="Use Residual Connection"
+    )
+    parser.add_argument(
+        "--pos_int1", default=False, type=bool,  help="positional interaction1"
+    )
+    parser.add_argument(
+        "--pos_int2", default=False, type=bool,  help="positional interaction2"
+    )
+    parser.add_argument(
         "--kfold", default=False, type=bool, help="Kfold"
+    )
+    parser.add_argument(
+        "--n_folds", default=5, type=int, help="Num of Kfold"
     )
     parser.add_argument(
         "--past_present", default=False, type=bool, help="use past and present at the same time"
     )
     parser.add_argument("--num_workers", default=1, type=int, help="number of workers")
+    
+    parser.add_argument('--n_cont', type=int, help='The number of continuous features')
 
     # 모델
     parser.add_argument(
         "--hidden_dim", default=64, type=int, help="hidden dimension size"
     )
+    parser.add_argument(
+        "--resize_factor", default=3, type=int, help="determine intd"
+    )
     parser.add_argument("--n_layers", default=2, type=int, help="number of layers")
     parser.add_argument("--n_heads", default=2, type=int, help="number of heads")
     parser.add_argument("--drop_out", default=0.2, type=float, help="drop out rate")
+    parser.add_argument("--short_seq_len", default=5, type=int, help="drop out rate")
 
     # 훈련
     parser.add_argument("--n_epochs", default=20, type=int, help="number of epochs")
@@ -88,8 +112,14 @@ def parse_args():
     
     ### wandb ###
     parser.add_argument("--sweep_run", default=False, type=bool, help="sweep run?")
-    parser.add_argument("--tuning_count", default=5, type=int, help="tuning count")
+    parser.add_argument("--tuning_count", default=50, type=int, help="tuning count")
+
+    ### TabNet ###
+    parser.add_argument("--cat_emb_dim", default=1, type=int, help="categorical embedding dimensions")
+    parser.add_argument("--weights", default=False, type=bool, help="custom weights per class, 1 for auto")
 
     args = parser.parse_args()
 
     return args
+
+

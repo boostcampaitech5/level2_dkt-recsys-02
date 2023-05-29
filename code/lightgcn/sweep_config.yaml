@@ -1,0 +1,18 @@
+lightgcn:
+  method: bayes # 매개변수를 찾는 방식
+  metric: # 어떤 메트릭을 기준으로 좋은 실험을 찾을지
+    name: val_auc
+    goal: maximize
+  parameters: # 변경하고 싶은 parameters
+    lr:
+      min: 0.0005
+      max: 0.005
+    hidden_dim:
+      # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
+      min: 16
+      max: 300
+    n_layers:
+      # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
+      min: 1
+      max: 16
+

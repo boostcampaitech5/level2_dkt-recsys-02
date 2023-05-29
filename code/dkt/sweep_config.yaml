@@ -4,17 +4,28 @@ lstm:
     name: val_auc
     goal: maximize
   parameters: # 변경하고 싶은 parameters
-    lr:
-      # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
-      # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
-      values: [1e-2, 1e-3, 1e-4]
+    # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
+    # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
     n_epochs:
-      min: 1
-      max: 3
+      value: 30
     drop_out:
-      # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
+    # 연속형의 경우 최대/최소값을 기입해주면 그 범위 안에서 값을 적절히 선택하여 실험을 진행합니다.
       min: 0.0
       max: 0.5
+    hidden_dim:
+      values: [16, 32, 64, 128, 256, 512]
+    batch_size:
+      values: [64, 128, 256, 512]
+    lr:
+      min: 1e-4
+      max: 1e-2
+    max_seq_len:
+      min: 5
+      max: 50
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 bert:
@@ -24,13 +35,26 @@ bert:
     goal: maximize
   parameters:
     lr:
-      values: [1e-2, 1e-3, 1e-4]
-    n_epochs:
-      min: 1
-      max: 3
+      min: 1e-4
+      max: 1e-2
+    n_epochs:      
+      value: 30
     drop_out:
       min: 0.0
       max: 0.5
+    hidden_dim:
+      values : [32,64,128,256,512]
+    n_layers:
+      min: 1 
+      max: 10
+    n_heads:
+      values: [1,2,4,8,16,32]
+    batch_size:
+      values: [64,128,256,512]
+    pos_int1:
+      values:
+        - True
+        - False
 
 
 lastquery:
@@ -47,3 +71,174 @@ lastquery:
     drop_out:
       min: 0.0
       max: 0.5
+
+translstm_g:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [16, 32, 64, 128, 256, 512, 1024]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    n_heads:
+      values: [2, 4, 8]
+    graph_dim:
+      values: [256, 236, 206, 255, 250, 246, 205]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    resize_factor:
+      values: [2,3,4,5]
+    max_seq_len:
+      min: 5
+      max: 200
+    hidden_dim:
+      values: [32, 64, 128, 256, 512]
+    window: #seq_len에 adaptive하게 조정이 필요 seq len = 10 , window = 30 -> 에러는 안나나 건너뛰는 데이터 너무 많아짐
+      min: 1
+      max: 50
+    use_res:
+      values:
+        - True
+        - False
+    pos_int1:
+      values:
+        - True
+        - False
+
+
+lstmattn:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [64, 128, 256, 512, 1024]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    max_seq_len:
+      min: 5
+      max: 300
+    hidden_dim:
+      values: [32, 64, 128, 256, 512]
+    n_heads:
+      values: [1,2,4,8,16,32]
+    shuffle_n:
+      values: [0, 1]
+    use_res:
+      values:
+        - True
+        - False
+    graph_dim:
+      values: [256, 236, 206, 255, 250, 246, 205]
+    pos_int1:
+      values:
+        - True
+        - False
+
+sakt:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [32, 64, 128, 256, 512, 1024]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    max_seq_len:
+      min: 5
+      max: 200
+    hidden_dim:
+      values: [32, 64, 128, 256, 512, 1024]
+    n_heads:
+      values: [1,2,4,8,16,32]
+    shuffle_n:
+      values: [0, 1]
+    use_res:
+      values:
+        - True
+        - False
+    pos_int1:
+      values:
+        - True
+        - False
+
+
+saktlstm:
+  method: bayes
+  metric:
+    name: val_auc
+    goal: maximize
+  parameters:
+    lr:
+      min: 0.0005
+      max: 0.01
+    batch_size:
+      values: [64, 128, 256, 512]
+    n_layers:
+      values: [1, 2, 3, 4, 5]
+    drop_out:
+      min: 0.0
+      max: 0.5
+    max_seq_len:
+      min: 5
+      max: 300
+    hidden_dim:
+      values: [32, 64, 128, 256, 512]
+    n_heads:
+      values: [1,2,4,8,16,32]
+    shuffle_n:
+      values: [0, 1]
+    use_res:
+      values:
+        - True
+        - False
+    graph_dim:
+      values: [256, 236, 206, 255, 250, 246, 205]
+
+tabnet:
+  method: bayes # 매개변수를 찾는 방식
+  metric: # 어떤 메트릭을 기준으로 좋은 실험을 찾을지
+    name: val_auc
+    goal: maximize
+  parameters: # 변경하고 싶은 parameters
+    lr:
+      # 범주형의 경우 실험하고 싶은 값들을 리스트로 넣어줍니다.
+      # 연속형이더라도 실험하고 싶은 값들이 정해져있다면 리스트로 넣어줍니다.
+      values: [1e-2, 1e-3, 1e-4]
+    batch_size:
+      values: [256, 512, 1024, 2048, 4096, 8192, 16384]
+    hidden_dim:
+      values: [4, 8, 16, 32, 64]
+    cat_emb_dim:
+      min: 1
+      max: 10
+    seed:
+      min: 0
+      max: 42
+    clip_grad:
+      min: 1
+      max: 10
+    weights:
+      values:
+        - True
+        - False

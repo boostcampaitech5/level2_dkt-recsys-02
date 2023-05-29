@@ -1,6 +1,13 @@
 bert:
-  best_auc: -1
-  parameter: null
+  best_auc: 0.7861948785624323
+  parameter:
+    batch_size: 64.0
+    drop_out: 0.38892546768384945
+    hidden_dim: 16.0
+    lr: 0.0001
+    n_epochs: 100.0
+    n_heads: 8.0
+    n_layers: 1.0
 catboost:
   best_auc: -1
   parameter: null
@@ -14,11 +21,31 @@ lightgcn:
   best_auc: -1
   parameter: null
 lstm:
-  best_auc: -1
+  best_auc: 0.7642891494017957
   parameter:
+    batch_size: 512.0
+    drop_out: 0.2727314073029609
+    hidden_dim: 512.0
+    lr: 0.001
+    max_seq_len: 25.0
+    n_epochs: 100.0
 lstmattn:
+  best_auc: 0.8286815035432061
+  parameter:
+    batch_size: 1024.0
+    drop_out: 0.002222926393187441
+    graph_dim: 250.0
+    hidden_dim: 64.0
+    lr: 0.003431882887626233
+    max_seq_len: 24.0
+    n_layers: 2.0
+    pos_int1: 0.0
+    shuffle_n: 0.0
+    use_res: 1.0
+    window: 9.0
+saint:
   best_auc: -1
   parameter: null
-saint:
+translstm_g:
   best_auc: -1
   parameter: null
